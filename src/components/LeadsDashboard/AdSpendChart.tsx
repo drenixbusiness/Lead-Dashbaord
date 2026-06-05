@@ -83,19 +83,25 @@ export default function AdSpendChart({ data }: { data: LeadsDataRow[] }) {
     },
     scales: {
       x: {
-        ticks: { maxRotation: 45, font: { size: 10 } },
-        grid: { display: false },
+        ticks: { maxRotation: 45, font: { size: 10, family: '"Google Sans", Arial, sans-serif' } },
+        grid: { color: 'rgba(8, 80, 65, 0.08)', lineWidth: 1 },
       },
       y: {
         type: 'linear' as const,
         position: 'left' as const,
-        ticks: { callback: (v: number | string) => Math.round(Number(v)) },
-        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: {
+          font: { size: 10, family: '"Google Sans", Arial, sans-serif' },
+          callback: (v: number | string) => Math.round(Number(v)),
+        },
+        grid: { color: 'rgba(8, 80, 65, 0.13)', lineWidth: 1 },
       },
       y1: {
         type: 'linear' as const,
         position: 'right' as const,
-        ticks: { callback: (v: number | string) => `${Math.round(Number(v))}%` },
+        ticks: {
+          font: { size: 10, family: '"Google Sans", Arial, sans-serif' },
+          callback: (v: number | string) => `${Math.round(Number(v))}%`,
+        },
         grid: { drawOnChartArea: false },
       },
     },
