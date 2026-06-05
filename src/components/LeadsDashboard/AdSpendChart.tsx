@@ -74,9 +74,12 @@ export default function AdSpendChart({ data }: { data: LeadsDataRow[] }) {
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = Math.round(ctx.parsed.y ?? 0);
-            if (ctx.dataset.label === 'Ad spend ($)') return ` $${val.toLocaleString()}`;
-            if (ctx.dataset.label === 'Hire rate %') return ` ${val}%`;
-            return ` ${val}`;
+            if (ctx.dataset.label === 'Ad spend ($)') return ` Ad spend: $${val.toLocaleString()}`;
+            if (ctx.dataset.label === 'Hire rate %') {
+              const hired = data[ctx.dataIndex]?.hired ?? 0;
+              return ` Hire rate: ${val}% (${hired} hired)`;
+            }
+            return ` Leads: ${val}`;
           },
         },
       },
