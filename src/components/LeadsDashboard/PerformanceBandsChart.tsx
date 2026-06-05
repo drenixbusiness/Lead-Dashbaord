@@ -99,8 +99,21 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (ctx: TooltipItem<'line'>) =>
-            ` ${ctx.dataset.label}: ${Math.round(ctx.parsed.y ?? 0)}`,
+          label: (ctx: TooltipItem<'line'>) => {
+            const val = Math.round(ctx.parsed.y ?? 0);
+            if (ctx.dataset.label === 'Current') return ` Current leads: ${val}`;
+            return ` ${ctx.dataset.label} target: ${val}`;
+          },
+          afterBody: (items: TooltipItem<'line'>[]) => {
+            if (!items.length) return [];
+            const row = data[items[0].dataIndex];
+            if (!row) return [];
+            return [
+              '',
+              ` Hired: ${row.hired} drivers (${row.hire_rate_pct}%)`,
+              ` Ad spend: $${row.ad_spend_usd.toLocaleString()}`,
+            ];
+          },
         },
       },
     },
