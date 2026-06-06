@@ -4,7 +4,9 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  BarController,
   BarElement,
+  LineController,
   PointElement,
   LineElement,
   Tooltip,
@@ -14,7 +16,7 @@ import type { TooltipItem } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import type { LeadsDataRow } from '../../types/leads';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarController, BarElement, LineController, PointElement, LineElement, Tooltip, Legend);
 
 const LEGEND_ITEMS = [
   { color: '#9FE1CB', label: 'Leads', shape: 'bar' },
