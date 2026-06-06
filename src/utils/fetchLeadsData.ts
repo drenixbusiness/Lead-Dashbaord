@@ -7,12 +7,12 @@ const SHEET_TAB = 'Main';
 
 // Mock numbers reflect the team's real-world baseline: ~300 leads/month at ~$5 cost per lead.
 const MOCK_DATA: LeadsDataRow[] = [
-  { month: 'Jan 2026', leads: 280, hired: 11, hired_by_leads: 9,  hire_rate_pct: 3.9, ad_spend_usd: 1400, high_band: 350, normal_band: 300, low_band: 240 },
-  { month: 'Feb 2026', leads: 305, hired: 13, hired_by_leads: 10, hire_rate_pct: 4.3, ad_spend_usd: 1525, high_band: 350, normal_band: 300, low_band: 240 },
-  { month: 'Mar 2026', leads: 320, hired: 14, hired_by_leads: 11, hire_rate_pct: 4.4, ad_spend_usd: 1600, high_band: 350, normal_band: 300, low_band: 240 },
-  { month: 'Apr 2026', leads: 295, hired: 12, hired_by_leads: 9,  hire_rate_pct: 4.1, ad_spend_usd: 1475, high_band: 350, normal_band: 300, low_band: 240 },
-  { month: 'May 2026', leads: 312, hired: 14, hired_by_leads: 11, hire_rate_pct: 4.5, ad_spend_usd: 1560, high_band: 350, normal_band: 300, low_band: 240 },
-  { month: 'Jun 2026', leads: 330, hired: 16, hired_by_leads: 13, hire_rate_pct: 4.8, ad_spend_usd: 1650, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Jan 2026', leads: 280, hired: 11, hired_by_leads: 9,  hired_by_leadbase: 1, hired_by_referral: 1, hire_rate_pct: 3.9, ad_spend_usd: 1400, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Feb 2026', leads: 305, hired: 13, hired_by_leads: 10, hired_by_leadbase: 1, hired_by_referral: 2, hire_rate_pct: 4.3, ad_spend_usd: 1525, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Mar 2026', leads: 320, hired: 14, hired_by_leads: 11, hired_by_leadbase: 1, hired_by_referral: 2, hire_rate_pct: 4.4, ad_spend_usd: 1600, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Apr 2026', leads: 295, hired: 12, hired_by_leads: 9,  hired_by_leadbase: 2, hired_by_referral: 1, hire_rate_pct: 4.1, ad_spend_usd: 1475, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'May 2026', leads: 312, hired: 14, hired_by_leads: 11, hired_by_leadbase: 1, hired_by_referral: 2, hire_rate_pct: 4.5, ad_spend_usd: 1560, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Jun 2026', leads: 330, hired: 16, hired_by_leads: 13, hired_by_leadbase: 1, hired_by_referral: 2, hire_rate_pct: 4.8, ad_spend_usd: 1650, high_band: 350, normal_band: 300, low_band: 240 },
 ];
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -82,6 +82,8 @@ export async function fetchLeadsData(): Promise<LeadsDataResult> {
           leads,
           hired,
           hired_by_leads: cellNumber(row, index, 'Hired by Leads'),
+          hired_by_leadbase: cellNumber(row, index, 'Hired by Lead Base'),
+          hired_by_referral: cellNumber(row, index, 'Hired by Referral'),
           hire_rate_pct: leads > 0 ? Math.round((hired / leads) * 1000) / 10 : 0,
           ad_spend_usd: cellNumber(row, index, 'Amount Spent'),
         };

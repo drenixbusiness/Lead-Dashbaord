@@ -7,6 +7,9 @@ import PerformanceBandsChart from './PerformanceBandsChart';
 import LeadsHireRateChart from './LeadsHireRateChart';
 import AdSpendChart from './AdSpendChart';
 import HireRateSummaryCard from './HireRateSummaryCard';
+import HireRateBreakdownCard from './HireRateBreakdownCard';
+import HiresBySourceChart from './HiresBySourceChart';
+import HireRateCompositionChart from './HireRateCompositionChart';
 
 const CARD_STYLE: React.CSSProperties = {
   background: '#f0faf5',
@@ -31,9 +34,9 @@ function SkeletonPulse({ style }: { style?: React.CSSProperties }) {
   );
 }
 
-function SkeletonCard() {
+function SkeletonCard({ height = 120 }: { height?: number }) {
   return (
-    <div style={{ ...CARD_STYLE, gap: 10 }}>
+    <div style={{ ...CARD_STYLE, gap: 10, height }}>
       <SkeletonPulse style={{ height: 14, width: '55%' }} />
       <SkeletonPulse style={{ height: 10, width: '40%' }} />
       <SkeletonPulse style={{ flex: 1, minHeight: 60 }} />
@@ -112,8 +115,7 @@ export default function DashboardContent({ data, error }: Props) {
           100% { background-position: -200% 0; }
         }
         .leads-dashboard {
-          height: 100dvh;
-          overflow: hidden;
+          min-height: 100dvh;
           background: #ffffff;
           display: flex;
           flex-direction: column;
@@ -121,33 +123,41 @@ export default function DashboardContent({ data, error }: Props) {
           gap: 12px;
           box-sizing: border-box;
         }
+        .leads-kpi-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
         .leads-bottom-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 12px;
-          flex: 1 1 0;
-          min-height: 0;
         }
         @media (max-width: 768px) {
           .leads-dashboard {
-            height: auto;
-            overflow: visible;
             padding: 12px;
           }
+          .leads-kpi-row,
           .leads-bottom-row {
             grid-template-columns: 1fr;
-            flex: none;
           }
         }
       `}</style>
       <div className="leads-dashboard">
         {!mounted ? (
           <>
-            <SkeletonCard />
-            <SkeletonCard />
+            <div className="leads-kpi-row">
+              <SkeletonCard height={120} />
+              <SkeletonCard height={120} />
+            </div>
+            <SkeletonCard height={380} />
             <div className="leads-bottom-row">
-              <SkeletonCard />
-              <SkeletonCard />
+              <SkeletonCard height={360} />
+              <SkeletonCard height={360} />
+            </div>
+            <div className="leads-bottom-row">
+              <SkeletonCard height={380} />
+              <SkeletonCard height={380} />
             </div>
           </>
         ) : error ? (
@@ -156,21 +166,35 @@ export default function DashboardContent({ data, error }: Props) {
           </div>
         ) : (
           <>
-            {/* Headline KPI — lead-to-hire conversion, % and headcount */}
-            <div style={{ ...CARD_STYLE, flex: '0 0 auto' }}>
-              <HireRateSummaryCard data={data} />
-            </div>
-            {/* Chart 3 — Performance Bands (full width, top) */}
-            <div style={{ ...CARD_STYLE, flex: '1 1 0' }}>
-              <PerformanceBandsChart data={data} />
-            </div>
-            {/* Charts 1 & 2 — bottom row */}
-            <div className="leads-bottom-row">
+            {/* Headline KPIs — lead volume conversion, then hiring-rate composition */}
+            <div className="leads-kpi-row">
               <div style={CARD_STYLE}>
-                <LeadsHireRateChart data={data} />
+                <HireRateSummaryCard data={data} />
               </div>
               <div style={CARD_STYLE}>
+                <HireRateBreakdownCard data={data} />
+              </div>
+            </div>
+            {/* Performance Bands — full width */}
+            <div style={{ ...CARD_STYLE, height: 380 }}>
+              <PerformanceBandsChart data={data} />
+            </div>
+            {/* Leads & hire rate / Ad spend — side by side */}
+            <div className="leads-bottom-row">
+              <div style={{ ...CARD_STYLE, height: 360 }}>
+                <LeadsHireRateChart data={data} />
+              </div>
+              <div style={{ ...CARD_STYLE, height: 360 }}>
                 <AdSpendChart data={data} />
+              </div>
+            </div>
+            {/* Hires by source — counts (left) vs rate composition (right) */}
+            <div className="leads-bottom-row">
+              <div style={{ ...CARD_STYLE, height: 380 }}>
+                <HiresBySourceChart data={data} />
+              </div>
+              <div style={{ ...CARD_STYLE, height: 380 }}>
+                <HireRateCompositionChart data={data} />
               </div>
             </div>
           </>
