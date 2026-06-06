@@ -2,6 +2,7 @@ export interface LeadsDataRow {
   month: string;
   leads: number;
   hired: number;
+  hired_by_leads: number;
   hire_rate_pct: number;
   ad_spend_usd: number;
   high_band: number;

@@ -2,23 +2,53 @@ import type { LeadsDataRow, LeadsDataResult } from '../types/leads';
 
 const SHEET_ID = process.env.LEADS_SHEET_ID;
 
+// The "Leads Performance Report" sheet keeps its monthly numbers on the "JM" tab.
+const SHEET_TAB = 'Main';
+
+// Mock numbers reflect the team's real-world baseline: ~300 leads/month at ~$5 cost per lead.
 const MOCK_DATA: LeadsDataRow[] = [
-  { month: 'Jul 2024', leads: 98,  hired: 3, hire_rate_pct: 3.1, ad_spend_usd: 3200, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Aug 2024', leads: 112, hired: 4, hire_rate_pct: 3.6, ad_spend_usd: 3400, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Sep 2024', leads: 75,  hired: 2, hire_rate_pct: 2.7, ad_spend_usd: 3000, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Oct 2024', leads: 65,  hired: 2, hire_rate_pct: 3.1, ad_spend_usd: 3800, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Nov 2024', leads: 88,  hired: 3, hire_rate_pct: 3.4, ad_spend_usd: 4200, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Dec 2024', leads: 143, hired: 5, hire_rate_pct: 3.5, ad_spend_usd: 5100, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Jan 2025', leads: 162, hired: 6, hire_rate_pct: 3.7, ad_spend_usd: 5800, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Feb 2025', leads: 134, hired: 5, hire_rate_pct: 3.7, ad_spend_usd: 5200, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Mar 2025', leads: 175, hired: 7, hire_rate_pct: 4.0, ad_spend_usd: 6000, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Apr 2025', leads: 191, hired: 8, hire_rate_pct: 4.2, ad_spend_usd: 6500, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'May 2025', leads: 158, hired: 6, hire_rate_pct: 3.8, ad_spend_usd: 5900, high_band: 180, normal_band: 130, low_band: 80 },
-  { month: 'Jun 2025', leads: 203, hired: 9, hire_rate_pct: 4.4, ad_spend_usd: 7200, high_band: 180, normal_band: 130, low_band: 80 },
+  { month: 'Jan 2026', leads: 280, hired: 11, hired_by_leads: 9,  hire_rate_pct: 3.9, ad_spend_usd: 1400, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Feb 2026', leads: 305, hired: 13, hired_by_leads: 10, hire_rate_pct: 4.3, ad_spend_usd: 1525, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Mar 2026', leads: 320, hired: 14, hired_by_leads: 11, hire_rate_pct: 4.4, ad_spend_usd: 1600, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Apr 2026', leads: 295, hired: 12, hired_by_leads: 9,  hire_rate_pct: 4.1, ad_spend_usd: 1475, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'May 2026', leads: 312, hired: 14, hired_by_leads: 11, hire_rate_pct: 4.5, ad_spend_usd: 1560, high_band: 350, normal_band: 300, low_band: 240 },
+  { month: 'Jun 2026', leads: 330, hired: 16, hired_by_leads: 13, hire_rate_pct: 4.8, ad_spend_usd: 1650, high_band: 350, normal_band: 300, low_band: 240 },
 ];
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// The sheet only stores a month number (1-12); pair it with the most plausible year —
+// the current year, unless that month hasn't happened yet (then it must be last year's row).
+function monthLabel(monthNum: number): string {
+  const idx = Math.round(monthNum) - 1;
+  if (idx < 0 || idx > 11) return String(monthNum);
+  const now = new Date();
+  const currentMonthIdx = now.getMonth();
+  const year = idx > currentMonthIdx ? now.getFullYear() - 1 : now.getFullYear();
+  return `${MONTH_NAMES[idx]} ${year}`;
+}
 
 type GvizCell = { v: string | number | null } | null;
 type GvizRow = { c: GvizCell[] };
+type GvizCol = { label?: string };
+
+// Look columns up by their header label rather than fixed position — the report has
+// a leading spacer column and extra fields (CPL, targets, notes) we don't all use.
+function columnIndex(cols: GvizCol[]): Record<string, number> {
+  const index: Record<string, number> = {};
+  cols.forEach((col, i) => {
+    const label = col?.label?.trim();
+    if (label) index[label] = i;
+  });
+  return index;
+}
+
+function cellNumber(row: GvizRow, index: Record<string, number>, label: string): number {
+  const i = index[label];
+  if (i == null) return 0;
+  const v = row.c?.[i]?.v;
+  return typeof v === 'number' ? v : Number(v ?? 0);
+}
 
 export async function fetchLeadsData(): Promise<LeadsDataResult> {
   if (!SHEET_ID) {
@@ -26,7 +56,7 @@ export async function fetchLeadsData(): Promise<LeadsDataResult> {
   }
 
   const url =
-    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=monthly_data`;
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_TAB}`;
 
   try {
     const res = await fetch(url, { cache: 'no-store' });
@@ -39,22 +69,36 @@ export async function fetchLeadsData(): Promise<LeadsDataResult> {
       .replace(/\);\s*$/, '');
     const json = JSON.parse(jsonStr);
 
+    const cols: GvizCol[] = json?.table?.cols ?? [];
     const rows: GvizRow[] = json?.table?.rows ?? [];
+    const index = columnIndex(cols);
 
-    const data: LeadsDataRow[] = rows
-      .filter((row) => row.c?.[0]?.v != null)
-      .map((row) => ({
-        month: String(row.c[0]?.v ?? ''),
-        leads: Number(row.c[1]?.v ?? 0),
-        hired: Number(row.c[2]?.v ?? 0),
-        hire_rate_pct: Number(row.c[3]?.v ?? 0),
-        ad_spend_usd: Number(row.c[4]?.v ?? 0),
-        high_band: Number(row.c[5]?.v ?? 0),
-        normal_band: Number(row.c[6]?.v ?? 0),
-        low_band: Number(row.c[7]?.v ?? 0),
-      }));
+    const months = rows
+      .map((row) => {
+        const leads = cellNumber(row, index, 'Total Leads');
+        const hired = cellNumber(row, index, 'Hired Total');
+        return {
+          month: monthLabel(cellNumber(row, index, 'Month')),
+          leads,
+          hired,
+          hired_by_leads: cellNumber(row, index, 'Hired by Leads'),
+          hire_rate_pct: leads > 0 ? Math.round((hired / leads) * 1000) / 10 : 0,
+          ad_spend_usd: cellNumber(row, index, 'Amount Spent'),
+        };
+      })
+      // Drop months the report hasn't reached yet (no leads logged).
+      .filter((row) => row.leads > 0);
 
-    if (data.length === 0) throw new Error('Sheet returned no data rows. Check the sheet ID and tab name.');
+    if (months.length === 0) throw new Error('Sheet returned no data rows. Check the sheet ID and tab name.');
+
+    // The report doesn't carry High/Normal/Low band targets — derive them from the
+    // months on hand so Performance Bands still gives a meaningful read.
+    const avgLeads = months.reduce((s, r) => s + r.leads, 0) / months.length;
+    const normal_band = Math.round(avgLeads);
+    const high_band = Math.round(avgLeads * 1.25);
+    const low_band = Math.round(avgLeads * 0.7);
+
+    const data: LeadsDataRow[] = months.map((row) => ({ ...row, high_band, normal_band, low_band }));
 
     return { data };
   } catch (err) {

@@ -6,6 +6,7 @@ import type { LeadsDataRow } from '../../types/leads';
 import PerformanceBandsChart from './PerformanceBandsChart';
 import LeadsHireRateChart from './LeadsHireRateChart';
 import AdSpendChart from './AdSpendChart';
+import HireRateSummaryCard from './HireRateSummaryCard';
 
 const CARD_STYLE: React.CSSProperties = {
   background: '#f0faf5',
@@ -143,6 +144,7 @@ export default function DashboardContent({ data, error }: Props) {
         {!mounted ? (
           <>
             <SkeletonCard />
+            <SkeletonCard />
             <div className="leads-bottom-row">
               <SkeletonCard />
               <SkeletonCard />
@@ -154,6 +156,10 @@ export default function DashboardContent({ data, error }: Props) {
           </div>
         ) : (
           <>
+            {/* Headline KPI — lead-to-hire conversion, % and headcount */}
+            <div style={{ ...CARD_STYLE, flex: '0 0 auto' }}>
+              <HireRateSummaryCard data={data} />
+            </div>
             {/* Chart 3 — Performance Bands (full width, top) */}
             <div style={{ ...CARD_STYLE, flex: '1 1 0' }}>
               <PerformanceBandsChart data={data} />

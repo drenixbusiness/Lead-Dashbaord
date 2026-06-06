@@ -4,6 +4,7 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  LineController,
   PointElement,
   LineElement,
   Tooltip,
@@ -13,7 +14,7 @@ import type { TooltipItem } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import type { LeadsDataRow } from '../../types/leads';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Tooltip, Legend);
 
 const LEGEND_ITEMS = [
   { color: '#BA7517', label: 'Ad spend ($)', dash: false },
@@ -47,7 +48,7 @@ export default function AdSpendChart({ data }: { data: LeadsDataRow[] }) {
         pointRadius: 3,
         pointBackgroundColor: '#1D9E75',
         tension: 0.3,
-        yAxisID: 'y',
+        yAxisID: 'y2',
       },
       {
         label: 'Hire rate %',
@@ -106,6 +107,10 @@ export default function AdSpendChart({ data }: { data: LeadsDataRow[] }) {
           callback: (v: number | string) => `${Math.round(Number(v))}%`,
         },
         grid: { drawOnChartArea: false },
+      },
+      y2: {
+        type: 'linear' as const,
+        display: false,
       },
     },
   };
