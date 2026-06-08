@@ -17,27 +17,30 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// Fixed hire rate targets (%) — all sources combined standard is 4%
-const FIXED_NORMAL = 4;
-const FIXED_HIGH = 5;
+// Leads-only standard: 300 leads × 3% = 9 hires
+const FIXED_NORMAL = 3;
 const FIXED_LOW = 1.5;
 
 const LEGEND_ITEMS = [
-  { color: '#1D9E75', label: 'Normal', dash: true },
-  { color: '#E24B4A', label: 'Low', dash: true },
-  { color: '#534AB7', label: 'Current', dash: false, thick: true, dot: true },
+  { color: '#1D9E75', label: 'Normal (3%)', dash: true },
+  { color: '#E24B4A', label: 'Low (1.5%)', dash: true },
+  { color: '#185FA5', label: 'Leads-only rate', dash: false, thick: true, dot: true },
 ];
 
 function computeStats(data: LeadsDataRow[]) {
-  if (data.length === 0) return { avgRate: 0, aboveNormal: 0, belowLow: 0 };
-  const avgRate = Math.round((data.reduce((s, r) => s + r.hire_rate_pct, 0) / data.length) * 10) / 10;
-  const aboveNormal = data.filter((r) => r.hire_rate_pct > FIXED_NORMAL).length;
-  const belowLow = data.filter((r) => r.hire_rate_pct < FIXED_LOW).length;
+  if (data.length === 0) return { avgRate: '0', aboveNormal: 0, belowLow: 0 };
+  const rates = data.map((r) => (r.leads > 0 ? (r.hired_by_leads / r.leads) * 100 : 0));
+  const avgRate = (rates.reduce((s, v) => s + v, 0) / rates.length).toFixed(1);
+  const aboveNormal = rates.filter((v) => v > FIXED_NORMAL).length;
+  const belowLow = rates.filter((v) => v < FIXED_LOW).length;
   return { avgRate, aboveNormal, belowLow };
 }
 
-export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
+export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataRow[] }) {
   const labels = data.map((r) => r.month);
+  const leadsOnlyRate = data.map((r) =>
+    r.leads > 0 ? Math.round((r.hired_by_leads / r.leads) * 1000) / 10 : 0
+  );
   const stats = computeStats(data);
 
   const chartData = {
@@ -69,13 +72,13 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         tension: 0,
       },
       {
-        label: 'Current',
-        data: data.map((r) => r.hire_rate_pct),
-        borderColor: '#534AB7',
+        label: 'Leads-only rate',
+        data: leadsOnlyRate,
+        borderColor: '#185FA5',
         backgroundColor: 'transparent',
         borderWidth: 2.5,
         pointRadius: 4,
-        pointBackgroundColor: '#534AB7',
+        pointBackgroundColor: '#185FA5',
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
         tension: 0.25,
@@ -93,7 +96,7 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = ctx.parsed.y ?? 0;
-            if (ctx.dataset.label === 'Current') return ` Current hire rate: ${val.toFixed(1)}%`;
+            if (ctx.dataset.label === 'Leads-only rate') return ` Leads hire rate: ${val.toFixed(1)}%`;
             if (ctx.dataset.label === 'Normal') return ` Normal target: ${FIXED_NORMAL}% (standard)`;
             if (ctx.dataset.label === 'Low') return ` Low target: ${FIXED_LOW}% (min)`;
             return ` ${ctx.dataset.label}: ${val}%`;
@@ -102,7 +105,11 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
             if (!items.length) return [];
             const row = data[items[0].dataIndex];
             if (!row) return [];
-            return ['', ` Hired: ${row.hired} drivers`, ` Total leads: ${row.leads}`];
+            return [
+              '',
+              ` Hired via leads: ${row.hired_by_leads}`,
+              ` Total leads: ${row.leads}`,
+            ];
           },
         },
       },
@@ -123,20 +130,20 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
   };
 
   const pills = [
-    { label: 'Avg hire rate', value: `${stats.avgRate}%` },
+    { label: 'Avg leads hire rate', value: `${stats.avgRate}%` },
     { label: 'Months above normal', value: String(stats.aboveNormal) },
     { label: 'Months below low', value: String(stats.belowLow) },
-    { label: 'Standard rate (leads)', value: `${FIXED_NORMAL}%` },
+    { label: 'Standard target', value: `${FIXED_NORMAL}%` },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-          Performance bands — hire rate (all sources) vs targets
+          Performance bands — hire rate (leads only) vs targets
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          Normal / Low thresholds + actual hire rate (Leads + Lead Base + Referral combined)
+          Normal / Low thresholds + actual hire rate from leads only (hired_by_leads ÷ leads)
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -162,13 +169,13 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         {pills.map((pill) => (
           <div key={pill.label} style={{
             flex: '1 1 120px',
-            background: 'rgba(83, 74, 183, 0.08)',
-            border: '0.5px solid #c5c2f0',
+            background: 'rgba(24, 95, 165, 0.08)',
+            border: '0.5px solid #b8d4f0',
             borderRadius: 8,
             padding: '6px 10px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#534AB7', lineHeight: 1.2 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#185FA5', lineHeight: 1.2 }}>
               {pill.value}
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, lineHeight: 1.3 }}>

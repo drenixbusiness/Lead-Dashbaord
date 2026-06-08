@@ -17,38 +17,27 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// Standard CPH: $1,500 spend ÷ (300 leads × 3% hire rate) = $1,500 ÷ 9 hires = $167
-const FIXED_TARGET_CPH = 167;
-
 const LEGEND_ITEMS = [
-  { color: '#1D9E75', label: 'Target CPH', dash: true },
-  { color: '#E24B4A', label: 'Cost per hire', dash: false, thick: true, dot: true },
+  { color: '#E24B4A', label: 'Cost per hire (leads only)', dash: false, thick: true, dot: true },
 ];
 
 export default function CostPerHireChart({ data }: { data: LeadsDataRow[] }) {
   const labels = data.map((r) => r.month);
-  const cphData = data.map((r) => (r.hired > 0 ? Math.round(r.ad_spend_usd / r.hired) : 0));
+  // Leads-only CPH: ad_spend ÷ hired_by_leads
+  const cphData = data.map((r) =>
+    r.hired_by_leads > 0 ? Math.round(r.ad_spend_usd / r.hired_by_leads) : 0
+  );
   const validCph = cphData.filter((v) => v > 0);
   const avgCph = validCph.length > 0 ? Math.round(validCph.reduce((s, v) => s + v, 0) / validCph.length) : 0;
   const minCph = validCph.length > 0 ? Math.min(...validCph) : 0;
   const maxCph = validCph.length > 0 ? Math.max(...validCph) : 0;
-  const belowTarget = cphData.filter((v, i) => v > 0 && v <= FIXED_TARGET_CPH).length;
+  const bestMonth = validCph.length > 0 ? data[cphData.indexOf(minCph)]?.month ?? '-' : '-';
 
   const chartData = {
     labels,
     datasets: [
       {
-        label: 'Target CPH',
-        data: data.map(() => FIXED_TARGET_CPH),
-        borderColor: '#1D9E75',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        tension: 0,
-      },
-      {
-        label: 'Cost per hire',
+        label: 'Cost per hire (leads)',
         data: cphData,
         borderColor: '#E24B4A',
         backgroundColor: 'rgba(226, 75, 74, 0.08)',
@@ -73,8 +62,7 @@ export default function CostPerHireChart({ data }: { data: LeadsDataRow[] }) {
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = Math.round(ctx.parsed.y ?? 0);
-            if (ctx.dataset.label === 'Target CPH') return ` Target CPH: $${FIXED_TARGET_CPH.toLocaleString()}`;
-            return ` Cost per hire: $${val.toLocaleString()}`;
+            return ` Cost per hire (leads): $${val.toLocaleString()}`;
           },
           afterBody: (items: TooltipItem<'line'>[]) => {
             if (!items.length) return [];
@@ -83,7 +71,8 @@ export default function CostPerHireChart({ data }: { data: LeadsDataRow[] }) {
             return [
               '',
               ` Ad spend: $${row.ad_spend_usd.toLocaleString()}`,
-              ` Hired: ${row.hired} drivers`,
+              ` Hired via leads: ${row.hired_by_leads}`,
+              ` Total leads: ${row.leads}`,
             ];
           },
         },
@@ -106,19 +95,19 @@ export default function CostPerHireChart({ data }: { data: LeadsDataRow[] }) {
 
   const pills = [
     { label: 'Avg cost per hire', value: `$${avgCph.toLocaleString()}` },
-    { label: 'Best month', value: `$${minCph.toLocaleString()}` },
-    { label: 'Worst month', value: `$${maxCph.toLocaleString()}` },
-    { label: 'Months at/under target', value: String(belowTarget) },
+    { label: 'Best month', value: bestMonth },
+    { label: 'Best CPH', value: `$${minCph.toLocaleString()}` },
+    { label: 'Worst CPH', value: `$${maxCph.toLocaleString()}` },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-          Monthly cost per hire
+          Monthly cost per hire — leads only
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          Ad spend ÷ drivers hired each month vs target
+          Ad spend ÷ drivers hired via leads each month
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { LeadsDataRow } from '../../types/leads';
 import PerformanceBandsChart from './PerformanceBandsChart';
 import HireRateBandsChart from './HireRateBandsChart';
+import HireRateLeadsOnlyBandsChart from './HireRateLeadsOnlyBandsChart';
 import SpendingBandsChart from './SpendingBandsChart';
 import CostPerHireChart from './CostPerHireChart';
 import LeadsHireRateChart from './LeadsHireRateChart';
@@ -12,7 +13,6 @@ import AdSpendChart from './AdSpendChart';
 import HireRateSummaryCard from './HireRateSummaryCard';
 import HireRateBreakdownCard from './HireRateBreakdownCard';
 import HiresBySourceChart from './HiresBySourceChart';
-import HireRateCompositionChart from './HireRateCompositionChart';
 
 const CARD_STYLE: React.CSSProperties = {
   background: '#f0faf5',
@@ -187,21 +187,25 @@ export default function DashboardContent({ data, error }: Props) {
             <div style={{ ...CARD_STYLE, height: 380 }}>
               <PerformanceBandsChart data={data} />
             </div>
-            {/* Performance Bands — Hire Rate & Spending side by side */}
+            {/* Hire Rate Bands — Leads Only (left) & All Sources (right) */}
             <div className="leads-bottom-row">
+              <div style={{ ...CARD_STYLE, height: 380 }}>
+                <HireRateLeadsOnlyBandsChart data={data} />
+              </div>
               <div style={{ ...CARD_STYLE, height: 380 }}>
                 <HireRateBandsChart data={data} />
               </div>
-              <div style={{ ...CARD_STYLE, height: 380 }}>
-                <SpendingBandsChart data={data} />
-              </div>
             </div>
-            {/* Monthly Cost Per Hire & Hires by Source */}
+            {/* Spending Bands — full width */}
+            <div style={{ ...CARD_STYLE, height: 380 }}>
+              <SpendingBandsChart data={data} />
+            </div>
+            {/* Monthly Cost Per Hire & Hires by Source (merged: count + %) */}
             <div className="leads-bottom-row">
-              <div style={{ ...CARD_STYLE, height: 380 }}>
+              <div style={{ ...CARD_STYLE, height: 400 }}>
                 <CostPerHireChart data={data} />
               </div>
-              <div style={{ ...CARD_STYLE, height: 380 }}>
+              <div style={{ ...CARD_STYLE, height: 400 }}>
                 <HiresBySourceChart data={data} />
               </div>
             </div>
@@ -213,10 +217,6 @@ export default function DashboardContent({ data, error }: Props) {
               <div style={{ ...CARD_STYLE, height: 360 }}>
                 <AdSpendChart data={data} />
               </div>
-            </div>
-            {/* Hire rate composition — full width */}
-            <div style={{ ...CARD_STYLE, height: 380 }}>
-              <HireRateCompositionChart data={data} />
             </div>
           </>
         )}
