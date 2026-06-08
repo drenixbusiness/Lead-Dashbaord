@@ -17,28 +17,28 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
+// Fixed spend targets: $5/lead rate → 300 leads=$1,500 | 400 leads=$2,000 | 200 leads=$1,000
+const FIXED_NORMAL = 1500;
+const FIXED_HIGH = 2000;
+const FIXED_LOW = 1000;
+
 const LEGEND_ITEMS = [
-  { color: '#085041', label: 'High', dash: true },
+  { color: '#085041', label: 'Max', dash: true },
   { color: '#1D9E75', label: 'Normal', dash: true },
-  { color: '#E24B4A', label: 'Low', dash: true },
-  { color: '#185FA5', label: 'Current', dash: false, thick: true, dot: true },
+  { color: '#E24B4A', label: 'Min', dash: true },
+  { color: '#BA7517', label: 'Current', dash: false, thick: true, dot: true },
 ];
 
-const FIXED_NORMAL = 300;
-const FIXED_HIGH = 400;
-const FIXED_LOW = 200;
-
 function computeStats(data: LeadsDataRow[]) {
-  if (data.length === 0) return { avgLeads: 0, aboveNormal: 0, belowLow: 0, budgetCorrections: 0 };
-  const avgLeads = Math.round(data.reduce((s, r) => s + r.leads, 0) / data.length);
-  const aboveNormal = data.filter((r) => r.leads > FIXED_NORMAL).length;
-  const belowLow = data.filter((r) => r.leads < FIXED_LOW).length;
-  const avgSpend = data.reduce((s, r) => s + r.ad_spend_usd, 0) / data.length;
-  const budgetCorrections = data.filter((r) => r.ad_spend_usd > avgSpend * 1.1).length;
-  return { avgLeads, aboveNormal, belowLow, budgetCorrections };
+  if (data.length === 0) return { avgSpend: 0, aboveNormal: 0, belowLow: 0, overBudget: 0 };
+  const avgSpend = Math.round(data.reduce((s, r) => s + r.ad_spend_usd, 0) / data.length);
+  const aboveNormal = data.filter((r) => r.ad_spend_usd > FIXED_NORMAL).length;
+  const belowLow = data.filter((r) => r.ad_spend_usd < FIXED_LOW).length;
+  const overBudget = data.filter((r) => r.ad_spend_usd > FIXED_HIGH).length;
+  return { avgSpend, aboveNormal, belowLow, overBudget };
 }
 
-export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }) {
+export default function SpendingBandsChart({ data }: { data: LeadsDataRow[] }) {
   const labels = data.map((r) => r.month);
   const stats = computeStats(data);
 
@@ -46,7 +46,7 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
     labels,
     datasets: [
       {
-        label: 'High',
+        label: 'Max',
         data: data.map(() => FIXED_HIGH),
         borderColor: '#085041',
         backgroundColor: 'transparent',
@@ -56,7 +56,6 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
         tension: 0,
       },
       {
-        // normal_band — also fills down to low_band (index 2)
         label: 'Normal',
         data: data.map(() => FIXED_NORMAL),
         borderColor: '#1D9E75',
@@ -66,13 +65,13 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
         pointRadius: 0,
         tension: 0,
         fill: {
-          target: 2, // fill toward low_band (dataset index 2)
+          target: 2,
           above: 'rgba(230, 75, 74, 0.07)',
           below: 'rgba(230, 75, 74, 0.07)',
         },
       },
       {
-        label: 'Low',
+        label: 'Min',
         data: data.map(() => FIXED_LOW),
         borderColor: '#E24B4A',
         backgroundColor: 'transparent',
@@ -83,12 +82,12 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
       },
       {
         label: 'Current',
-        data: data.map((r) => r.leads),
-        borderColor: '#185FA5',
+        data: data.map((r) => r.ad_spend_usd),
+        borderColor: '#BA7517',
         backgroundColor: 'transparent',
         borderWidth: 2.5,
         pointRadius: 4,
-        pointBackgroundColor: '#185FA5',
+        pointBackgroundColor: '#BA7517',
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
         tension: 0.25,
@@ -106,21 +105,17 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = Math.round(ctx.parsed.y ?? 0);
-            if (ctx.dataset.label === 'Current') return ` Current leads: ${val}`;
-            if (ctx.dataset.label === 'High') return ` High target: ${FIXED_HIGH} (max)`;
-            if (ctx.dataset.label === 'Normal') return ` Normal target: ${FIXED_NORMAL} (standard)`;
-            if (ctx.dataset.label === 'Low') return ` Low target: ${FIXED_LOW} (min)`;
-            return ` ${ctx.dataset.label} target: ${val}`;
+            if (ctx.dataset.label === 'Current') return ` Current spend: $${val.toLocaleString()}`;
+            if (ctx.dataset.label === 'Max') return ` Max budget: $${FIXED_HIGH.toLocaleString()} (400 leads)`;
+            if (ctx.dataset.label === 'Normal') return ` Normal budget: $${FIXED_NORMAL.toLocaleString()} (300 leads)`;
+            if (ctx.dataset.label === 'Min') return ` Min budget: $${FIXED_LOW.toLocaleString()} (200 leads)`;
+            return ` ${ctx.dataset.label}: $${val.toLocaleString()}`;
           },
           afterBody: (items: TooltipItem<'line'>[]) => {
             if (!items.length) return [];
             const row = data[items[0].dataIndex];
             if (!row) return [];
-            return [
-              '',
-              ` Hired: ${row.hired} drivers (${row.hire_rate_pct}%)`,
-              ` Ad spend: $${row.ad_spend_usd.toLocaleString()}`,
-            ];
+            return ['', ` Leads: ${row.leads}`, ` Hired: ${row.hired} drivers`];
           },
         },
       },
@@ -133,7 +128,7 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
       y: {
         ticks: {
           font: { size: 10, family: '"Google Sans", Arial, sans-serif' },
-          callback: (v: number | string) => Math.round(Number(v)),
+          callback: (v: number | string) => `$${Number(v).toLocaleString()}`,
         },
         grid: { color: 'rgba(8, 80, 65, 0.13)', lineWidth: 1 },
       },
@@ -141,20 +136,20 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
   };
 
   const pills = [
-    { label: 'Avg monthly leads', value: stats.avgLeads.toLocaleString() },
+    { label: 'Avg monthly spend', value: `$${stats.avgSpend.toLocaleString()}` },
     { label: 'Months above normal', value: String(stats.aboveNormal) },
-    { label: 'Months below low', value: String(stats.belowLow) },
-    { label: 'Budget corrections', value: String(stats.budgetCorrections) },
+    { label: 'Months below min', value: String(stats.belowLow) },
+    { label: 'Months over max', value: String(stats.overBudget) },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-          Performance bands — monthly leads vs targets
+          Performance bands — monthly spending vs targets
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          High / Normal / Low thresholds + actual performance
+          Max $2,000 / Normal $1,500 / Min $1,000 + actual ad spend
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -176,22 +171,17 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <Line data={chartData} options={options} />
       </div>
-      <div style={{
-        display: 'flex',
-        gap: 8,
-        marginTop: 10,
-        flexWrap: 'wrap',
-      }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         {pills.map((pill) => (
           <div key={pill.label} style={{
             flex: '1 1 120px',
-            background: 'rgba(29, 158, 117, 0.08)',
-            border: '0.5px solid #c2e8d6',
+            background: 'rgba(186, 117, 23, 0.08)',
+            border: '0.5px solid #e8d4a2',
             borderRadius: 8,
             padding: '6px 10px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#085041', lineHeight: 1.2 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#BA7517', lineHeight: 1.2 }}>
               {pill.value}
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, lineHeight: 1.3 }}>

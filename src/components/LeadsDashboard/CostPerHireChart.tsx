@@ -17,81 +17,48 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
+// Standard CPH: $1,500 spend ÷ (300 leads × 3% hire rate) = $1,500 ÷ 9 hires = $167
+const FIXED_TARGET_CPH = 167;
+
 const LEGEND_ITEMS = [
-  { color: '#085041', label: 'High', dash: true },
-  { color: '#1D9E75', label: 'Normal', dash: true },
-  { color: '#E24B4A', label: 'Low', dash: true },
-  { color: '#185FA5', label: 'Current', dash: false, thick: true, dot: true },
+  { color: '#1D9E75', label: 'Target CPH', dash: true },
+  { color: '#E24B4A', label: 'Cost per hire', dash: false, thick: true, dot: true },
 ];
 
-const FIXED_NORMAL = 300;
-const FIXED_HIGH = 400;
-const FIXED_LOW = 200;
-
-function computeStats(data: LeadsDataRow[]) {
-  if (data.length === 0) return { avgLeads: 0, aboveNormal: 0, belowLow: 0, budgetCorrections: 0 };
-  const avgLeads = Math.round(data.reduce((s, r) => s + r.leads, 0) / data.length);
-  const aboveNormal = data.filter((r) => r.leads > FIXED_NORMAL).length;
-  const belowLow = data.filter((r) => r.leads < FIXED_LOW).length;
-  const avgSpend = data.reduce((s, r) => s + r.ad_spend_usd, 0) / data.length;
-  const budgetCorrections = data.filter((r) => r.ad_spend_usd > avgSpend * 1.1).length;
-  return { avgLeads, aboveNormal, belowLow, budgetCorrections };
-}
-
-export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }) {
+export default function CostPerHireChart({ data }: { data: LeadsDataRow[] }) {
   const labels = data.map((r) => r.month);
-  const stats = computeStats(data);
+  const cphData = data.map((r) => (r.hired > 0 ? Math.round(r.ad_spend_usd / r.hired) : 0));
+  const validCph = cphData.filter((v) => v > 0);
+  const avgCph = validCph.length > 0 ? Math.round(validCph.reduce((s, v) => s + v, 0) / validCph.length) : 0;
+  const minCph = validCph.length > 0 ? Math.min(...validCph) : 0;
+  const maxCph = validCph.length > 0 ? Math.max(...validCph) : 0;
+  const belowTarget = cphData.filter((v, i) => v > 0 && v <= FIXED_TARGET_CPH).length;
 
   const chartData = {
     labels,
     datasets: [
       {
-        label: 'High',
-        data: data.map(() => FIXED_HIGH),
-        borderColor: '#085041',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        tension: 0,
-      },
-      {
-        // normal_band — also fills down to low_band (index 2)
-        label: 'Normal',
-        data: data.map(() => FIXED_NORMAL),
+        label: 'Target CPH',
+        data: data.map(() => FIXED_TARGET_CPH),
         borderColor: '#1D9E75',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
         borderDash: [6, 3],
         pointRadius: 0,
         tension: 0,
-        fill: {
-          target: 2, // fill toward low_band (dataset index 2)
-          above: 'rgba(230, 75, 74, 0.07)',
-          below: 'rgba(230, 75, 74, 0.07)',
-        },
       },
       {
-        label: 'Low',
-        data: data.map(() => FIXED_LOW),
+        label: 'Cost per hire',
+        data: cphData,
         borderColor: '#E24B4A',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        tension: 0,
-      },
-      {
-        label: 'Current',
-        data: data.map((r) => r.leads),
-        borderColor: '#185FA5',
-        backgroundColor: 'transparent',
+        backgroundColor: 'rgba(226, 75, 74, 0.08)',
         borderWidth: 2.5,
         pointRadius: 4,
-        pointBackgroundColor: '#185FA5',
+        pointBackgroundColor: '#E24B4A',
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
         tension: 0.25,
+        fill: 'origin',
       },
     ],
   };
@@ -106,11 +73,8 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = Math.round(ctx.parsed.y ?? 0);
-            if (ctx.dataset.label === 'Current') return ` Current leads: ${val}`;
-            if (ctx.dataset.label === 'High') return ` High target: ${FIXED_HIGH} (max)`;
-            if (ctx.dataset.label === 'Normal') return ` Normal target: ${FIXED_NORMAL} (standard)`;
-            if (ctx.dataset.label === 'Low') return ` Low target: ${FIXED_LOW} (min)`;
-            return ` ${ctx.dataset.label} target: ${val}`;
+            if (ctx.dataset.label === 'Target CPH') return ` Target CPH: $${FIXED_TARGET_CPH.toLocaleString()}`;
+            return ` Cost per hire: $${val.toLocaleString()}`;
           },
           afterBody: (items: TooltipItem<'line'>[]) => {
             if (!items.length) return [];
@@ -118,8 +82,8 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
             if (!row) return [];
             return [
               '',
-              ` Hired: ${row.hired} drivers (${row.hire_rate_pct}%)`,
               ` Ad spend: $${row.ad_spend_usd.toLocaleString()}`,
+              ` Hired: ${row.hired} drivers`,
             ];
           },
         },
@@ -133,7 +97,7 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
       y: {
         ticks: {
           font: { size: 10, family: '"Google Sans", Arial, sans-serif' },
-          callback: (v: number | string) => Math.round(Number(v)),
+          callback: (v: number | string) => `$${Number(v).toLocaleString()}`,
         },
         grid: { color: 'rgba(8, 80, 65, 0.13)', lineWidth: 1 },
       },
@@ -141,20 +105,20 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
   };
 
   const pills = [
-    { label: 'Avg monthly leads', value: stats.avgLeads.toLocaleString() },
-    { label: 'Months above normal', value: String(stats.aboveNormal) },
-    { label: 'Months below low', value: String(stats.belowLow) },
-    { label: 'Budget corrections', value: String(stats.budgetCorrections) },
+    { label: 'Avg cost per hire', value: `$${avgCph.toLocaleString()}` },
+    { label: 'Best month', value: `$${minCph.toLocaleString()}` },
+    { label: 'Worst month', value: `$${maxCph.toLocaleString()}` },
+    { label: 'Months at/under target', value: String(belowTarget) },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-          Performance bands — monthly leads vs targets
+          Monthly cost per hire
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          High / Normal / Low thresholds + actual performance
+          Ad spend ÷ drivers hired each month vs target
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -176,22 +140,17 @@ export default function PerformanceBandsChart({ data }: { data: LeadsDataRow[] }
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <Line data={chartData} options={options} />
       </div>
-      <div style={{
-        display: 'flex',
-        gap: 8,
-        marginTop: 10,
-        flexWrap: 'wrap',
-      }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         {pills.map((pill) => (
           <div key={pill.label} style={{
             flex: '1 1 120px',
-            background: 'rgba(29, 158, 117, 0.08)',
-            border: '0.5px solid #c2e8d6',
+            background: 'rgba(226, 75, 74, 0.07)',
+            border: '0.5px solid #f5c2c2',
             borderRadius: 8,
             padding: '6px 10px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#085041', lineHeight: 1.2 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#E24B4A', lineHeight: 1.2 }}>
               {pill.value}
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, lineHeight: 1.3 }}>
