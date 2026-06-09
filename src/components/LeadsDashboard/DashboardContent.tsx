@@ -6,8 +6,10 @@ import type { LeadsDataRow } from '../../types/leads';
 import PerformanceBandsChart from './PerformanceBandsChart';
 import HireRateBandsChart from './HireRateBandsChart';
 import HireRateLeadsOnlyBandsChart from './HireRateLeadsOnlyBandsChart';
+import LeadBaseBandsChart from './LeadBaseBandsChart';
 import SpendingBandsChart from './SpendingBandsChart';
 import CostPerHireChart from './CostPerHireChart';
+import OverallCostPerHireChart from './OverallCostPerHireChart';
 import LeadsHireRateChart from './LeadsHireRateChart';
 import AdSpendChart from './AdSpendChart';
 import HireRateSummaryCard from './HireRateSummaryCard';
@@ -189,34 +191,43 @@ export default function DashboardContent({ data, error }: Props) {
             </div>
             {/* Hire Rate Bands — Leads Only (left) & All Sources (right) */}
             <div className="leads-bottom-row">
-              <div style={{ ...CARD_STYLE, height: 380 }}>
+              <div style={{ ...CARD_STYLE, height: 400 }}>
                 <HireRateLeadsOnlyBandsChart data={data} />
               </div>
-              <div style={{ ...CARD_STYLE, height: 380 }}>
+              <div style={{ ...CARD_STYLE, height: 400 }}>
                 <HireRateBandsChart data={data} />
               </div>
             </div>
-            {/* Spending Bands — full width */}
-            <div style={{ ...CARD_STYLE, height: 380 }}>
-              <SpendingBandsChart data={data} />
+            {/* Lead Base Bands & Spending Bands */}
+            <div className="leads-bottom-row">
+              <div style={{ ...CARD_STYLE, height: 400 }}>
+                <LeadBaseBandsChart data={data} />
+              </div>
+              <div style={{ ...CARD_STYLE, height: 400 }}>
+                <SpendingBandsChart data={data} />
+              </div>
             </div>
-            {/* Monthly Cost Per Hire & Hires by Source (merged: count + %) */}
+            {/* Cost Per Hire — Leads Only (left) & Overall (right) */}
             <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <CostPerHireChart data={data} />
               </div>
               <div style={{ ...CARD_STYLE, height: 400 }}>
-                <HiresBySourceChart data={data} />
+                <OverallCostPerHireChart data={data} />
               </div>
             </div>
-            {/* Leads & hire rate / Ad spend — detail charts */}
+            {/* Hires by Source & Ad spend with bands */}
             <div className="leads-bottom-row">
-              <div style={{ ...CARD_STYLE, height: 360 }}>
-                <LeadsHireRateChart data={data} />
+              <div style={{ ...CARD_STYLE, height: 400 }}>
+                <HiresBySourceChart data={data} />
               </div>
-              <div style={{ ...CARD_STYLE, height: 360 }}>
+              <div style={{ ...CARD_STYLE, height: 400 }}>
                 <AdSpendChart data={data} />
               </div>
+            </div>
+            {/* Leads & hire rate detail */}
+            <div style={{ ...CARD_STYLE, height: 360 }}>
+              <LeadsHireRateChart data={data} />
             </div>
           </>
         )}

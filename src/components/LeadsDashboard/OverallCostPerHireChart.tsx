@@ -17,80 +17,37 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// Fixed hire rate targets (%) — all sources combined
-const FIXED_MAX = 15;    // max
-const FIXED_NORMAL = 7;  // standard
-const FIXED_MIN = 4;     // min
-
 const LEGEND_ITEMS = [
-  { color: '#085041', label: 'Max (15%)', dash: true },
-  { color: '#1D9E75', label: 'Normal (7%)', dash: true },
-  { color: '#E24B4A', label: 'Min (4%)', dash: true },
-  { color: '#534AB7', label: 'Current', dash: false, thick: true, dot: true },
+  { color: '#534AB7', label: 'Overall cost per hire', dash: false, thick: true, dot: true },
 ];
 
-function computeStats(data: LeadsDataRow[]) {
-  if (data.length === 0) return { avgRate: 0, aboveNormal: 0, belowMin: 0, atMax: 0 };
-  const avgRate = Math.round((data.reduce((s, r) => s + r.hire_rate_pct, 0) / data.length) * 10) / 10;
-  const aboveNormal = data.filter((r) => r.hire_rate_pct > FIXED_NORMAL).length;
-  const belowMin = data.filter((r) => r.hire_rate_pct < FIXED_MIN).length;
-  const atMax = data.filter((r) => r.hire_rate_pct >= FIXED_MAX).length;
-  return { avgRate, aboveNormal, belowMin, atMax };
-}
-
-export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
+export default function OverallCostPerHireChart({ data }: { data: LeadsDataRow[] }) {
   const labels = data.map((r) => r.month);
-  const stats = computeStats(data);
+  // Overall CPH: ad_spend ÷ total hired (all sources)
+  const cphData = data.map((r) =>
+    r.hired > 0 ? Math.round(r.ad_spend_usd / r.hired) : 0
+  );
+  const validCph = cphData.filter((v) => v > 0);
+  const avgCph = validCph.length > 0 ? Math.round(validCph.reduce((s, v) => s + v, 0) / validCph.length) : 0;
+  const minCph = validCph.length > 0 ? Math.min(...validCph) : 0;
+  const maxCph = validCph.length > 0 ? Math.max(...validCph) : 0;
+  const bestMonth = validCph.length > 0 ? data[cphData.indexOf(minCph)]?.month ?? '-' : '-';
 
   const chartData = {
     labels,
     datasets: [
       {
-        label: 'Max',
-        data: data.map(() => FIXED_MAX),
-        borderColor: '#085041',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        tension: 0,
-      },
-      {
-        label: 'Normal',
-        data: data.map(() => FIXED_NORMAL),
-        borderColor: '#1D9E75',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        tension: 0,
-        fill: {
-          target: 2,
-          above: 'rgba(230, 75, 74, 0.07)',
-          below: 'rgba(230, 75, 74, 0.07)',
-        },
-      },
-      {
-        label: 'Min',
-        data: data.map(() => FIXED_MIN),
-        borderColor: '#E24B4A',
-        backgroundColor: 'transparent',
-        borderWidth: 1.5,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        tension: 0,
-      },
-      {
-        label: 'Current',
-        data: data.map((r) => r.hire_rate_pct),
+        label: 'Overall CPH',
+        data: cphData,
         borderColor: '#534AB7',
-        backgroundColor: 'transparent',
+        backgroundColor: 'rgba(83, 74, 183, 0.08)',
         borderWidth: 2.5,
         pointRadius: 4,
         pointBackgroundColor: '#534AB7',
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
         tension: 0.25,
+        fill: 'origin',
       },
     ],
   };
@@ -104,18 +61,18 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
       tooltip: {
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
-            const val = ctx.parsed.y ?? 0;
-            if (ctx.dataset.label === 'Current') return ` Current hire rate: ${Number(val).toFixed(1)}%`;
-            if (ctx.dataset.label === 'Max') return ` Max: ${FIXED_MAX}%`;
-            if (ctx.dataset.label === 'Normal') return ` Normal: ${FIXED_NORMAL}% (standard)`;
-            if (ctx.dataset.label === 'Min') return ` Min: ${FIXED_MIN}%`;
-            return ` ${ctx.dataset.label}: ${val}%`;
+            const val = Math.round(ctx.parsed.y ?? 0);
+            return ` Overall cost per hire: $${val.toLocaleString()}`;
           },
           afterBody: (items: TooltipItem<'line'>[]) => {
             if (!items.length) return [];
             const row = data[items[0].dataIndex];
             if (!row) return [];
-            return ['', ` Hired: ${row.hired} drivers`, ` Total leads: ${row.leads}`];
+            return [
+              '',
+              ` Ad spend: $${row.ad_spend_usd.toLocaleString()}`,
+              ` Total hired: ${row.hired} (Leads: ${row.hired_by_leads}, LB: ${row.hired_by_leadbase}, Ref: ${row.hired_by_referral})`,
+            ];
           },
         },
       },
@@ -128,7 +85,7 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
       y: {
         ticks: {
           font: { size: 10, family: '"Google Sans", Arial, sans-serif' },
-          callback: (v: number | string) => `${Number(v).toFixed(1)}%`,
+          callback: (v: number | string) => `$${Number(v).toLocaleString()}`,
         },
         grid: { color: 'rgba(8, 80, 65, 0.13)', lineWidth: 1 },
       },
@@ -136,20 +93,20 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
   };
 
   const pills = [
-    { label: 'Avg hire rate', value: `${stats.avgRate}%` },
-    { label: 'Months above normal', value: String(stats.aboveNormal) },
-    { label: 'Months below min', value: String(stats.belowMin) },
-    { label: 'Months at max', value: String(stats.atMax) },
+    { label: 'Avg overall CPH', value: `$${avgCph.toLocaleString()}` },
+    { label: 'Best month', value: bestMonth },
+    { label: 'Best CPH', value: `$${minCph.toLocaleString()}` },
+    { label: 'Worst CPH', value: `$${maxCph.toLocaleString()}` },
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-          Performance bands — hire rate (all sources) vs targets
+          Monthly cost per hire — overall (all sources)
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          Max 15% / Normal 7% / Min 4% + actual hire rate (Leads + Lead Base + Referral)
+          Ad spend ÷ total drivers hired each month (Leads + Lead Base + Referral)
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -170,7 +127,7 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         {pills.map((pill) => (
           <div key={pill.label} style={{
             flex: '1 1 120px',
-            background: 'rgba(83, 74, 183, 0.08)',
+            background: 'rgba(83, 74, 183, 0.07)',
             border: '0.5px solid #c5c2f0',
             borderRadius: 8,
             padding: '6px 10px',

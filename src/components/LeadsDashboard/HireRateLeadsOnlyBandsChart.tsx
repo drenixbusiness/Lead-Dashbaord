@@ -17,23 +17,26 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// Leads-only standard: 300 leads × 3% = 9 hires
-const FIXED_NORMAL = 3;
-const FIXED_LOW = 1.5;
+// Leads-only hire rate targets
+const FIXED_TARGET = 10;  // top target
+const FIXED_NORMAL = 5;   // standard
+const FIXED_LOW = 3;      // minimum acceptable
 
 const LEGEND_ITEMS = [
-  { color: '#1D9E75', label: 'Normal (3%)', dash: true },
-  { color: '#E24B4A', label: 'Low (1.5%)', dash: true },
+  { color: '#085041', label: 'Target (10%)', dash: true },
+  { color: '#1D9E75', label: 'Normal (5%)', dash: true },
+  { color: '#E24B4A', label: 'Low (3%)', dash: true },
   { color: '#185FA5', label: 'Leads-only rate', dash: false, thick: true, dot: true },
 ];
 
 function computeStats(data: LeadsDataRow[]) {
-  if (data.length === 0) return { avgRate: '0', aboveNormal: 0, belowLow: 0 };
+  if (data.length === 0) return { avgRate: '0', aboveTarget: 0, aboveNormal: 0, belowLow: 0 };
   const rates = data.map((r) => (r.leads > 0 ? (r.hired_by_leads / r.leads) * 100 : 0));
   const avgRate = (rates.reduce((s, v) => s + v, 0) / rates.length).toFixed(1);
-  const aboveNormal = rates.filter((v) => v > FIXED_NORMAL).length;
+  const aboveTarget = rates.filter((v) => v >= FIXED_TARGET).length;
+  const aboveNormal = rates.filter((v) => v >= FIXED_NORMAL && v < FIXED_TARGET).length;
   const belowLow = rates.filter((v) => v < FIXED_LOW).length;
-  return { avgRate, aboveNormal, belowLow };
+  return { avgRate, aboveTarget, aboveNormal, belowLow };
 }
 
 export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataRow[] }) {
@@ -47,6 +50,16 @@ export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataR
     labels,
     datasets: [
       {
+        label: 'Target',
+        data: data.map(() => FIXED_TARGET),
+        borderColor: '#085041',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [6, 3],
+        pointRadius: 0,
+        tension: 0,
+      },
+      {
         label: 'Normal',
         data: data.map(() => FIXED_NORMAL),
         borderColor: '#1D9E75',
@@ -56,7 +69,7 @@ export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataR
         pointRadius: 0,
         tension: 0,
         fill: {
-          target: 1,
+          target: 2,
           above: 'rgba(230, 75, 74, 0.07)',
           below: 'rgba(230, 75, 74, 0.07)',
         },
@@ -96,20 +109,17 @@ export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataR
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = ctx.parsed.y ?? 0;
-            if (ctx.dataset.label === 'Leads-only rate') return ` Leads hire rate: ${val.toFixed(1)}%`;
-            if (ctx.dataset.label === 'Normal') return ` Normal target: ${FIXED_NORMAL}% (standard)`;
-            if (ctx.dataset.label === 'Low') return ` Low target: ${FIXED_LOW}% (min)`;
+            if (ctx.dataset.label === 'Leads-only rate') return ` Leads hire rate: ${Number(val).toFixed(1)}%`;
+            if (ctx.dataset.label === 'Target') return ` Target: ${FIXED_TARGET}%`;
+            if (ctx.dataset.label === 'Normal') return ` Normal: ${FIXED_NORMAL}% (standard)`;
+            if (ctx.dataset.label === 'Low') return ` Low: ${FIXED_LOW}% (min)`;
             return ` ${ctx.dataset.label}: ${val}%`;
           },
           afterBody: (items: TooltipItem<'line'>[]) => {
             if (!items.length) return [];
             const row = data[items[0].dataIndex];
             if (!row) return [];
-            return [
-              '',
-              ` Hired via leads: ${row.hired_by_leads}`,
-              ` Total leads: ${row.leads}`,
-            ];
+            return ['', ` Hired via leads: ${row.hired_by_leads}`, ` Total leads: ${row.leads}`];
           },
         },
       },
@@ -131,9 +141,9 @@ export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataR
 
   const pills = [
     { label: 'Avg leads hire rate', value: `${stats.avgRate}%` },
+    { label: 'Months at target', value: String(stats.aboveTarget) },
     { label: 'Months above normal', value: String(stats.aboveNormal) },
     { label: 'Months below low', value: String(stats.belowLow) },
-    { label: 'Standard target', value: `${FIXED_NORMAL}%` },
   ];
 
   return (
@@ -143,19 +153,14 @@ export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataR
           Performance bands — hire rate (leads only) vs targets
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          Normal / Low thresholds + actual hire rate from leads only (hired_by_leads ÷ leads)
+          Target 10% / Normal 5% / Low 3% + actual hire rate from leads only
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
         {LEGEND_ITEMS.map((item) => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#374151' }}>
             <svg width="18" height="10" style={{ flexShrink: 0 }}>
-              <line
-                x1="0" y1="5" x2="18" y2="5"
-                stroke={item.color}
-                strokeWidth={item.thick ? 2.5 : 1.5}
-                strokeDasharray={item.dash ? '5 2' : undefined}
-              />
+              <line x1="0" y1="5" x2="18" y2="5" stroke={item.color} strokeWidth={item.thick ? 2.5 : 1.5} strokeDasharray={item.dash ? '5 2' : undefined} />
               {item.dot && <circle cx="9" cy="5" r="3" fill={item.color} stroke="#fff" strokeWidth="1" />}
             </svg>
             {item.label}
@@ -175,12 +180,8 @@ export default function HireRateLeadsOnlyBandsChart({ data }: { data: LeadsDataR
             padding: '6px 10px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#185FA5', lineHeight: 1.2 }}>
-              {pill.value}
-            </div>
-            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, lineHeight: 1.3 }}>
-              {pill.label}
-            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#185FA5', lineHeight: 1.2 }}>{pill.value}</div>
+            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, lineHeight: 1.3 }}>{pill.label}</div>
           </div>
         ))}
       </div>

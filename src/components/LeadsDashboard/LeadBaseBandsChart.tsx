@@ -17,29 +17,33 @@ import type { LeadsDataRow } from '../../types/leads';
 
 ChartJS.register(CategoryScale, LinearScale, LineController, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// Fixed hire rate targets (%) — all sources combined
-const FIXED_MAX = 15;    // max
-const FIXED_NORMAL = 7;  // standard
-const FIXED_MIN = 4;     // min
+// Lead Base hire rate targets (hired_by_leadbase ÷ leads)
+const FIXED_MAX = 5;       // max
+const FIXED_NORMAL = 2;    // standard
+const FIXED_LOW = 1;       // min
 
 const LEGEND_ITEMS = [
-  { color: '#085041', label: 'Max (15%)', dash: true },
-  { color: '#1D9E75', label: 'Normal (7%)', dash: true },
-  { color: '#E24B4A', label: 'Min (4%)', dash: true },
-  { color: '#534AB7', label: 'Current', dash: false, thick: true, dot: true },
+  { color: '#085041', label: 'Max (5%)', dash: true },
+  { color: '#1D9E75', label: 'Normal (2%)', dash: true },
+  { color: '#E24B4A', label: 'Low (1%)', dash: true },
+  { color: '#185FA5', label: 'Lead Base rate', dash: false, thick: true, dot: true },
 ];
 
 function computeStats(data: LeadsDataRow[]) {
-  if (data.length === 0) return { avgRate: 0, aboveNormal: 0, belowMin: 0, atMax: 0 };
-  const avgRate = Math.round((data.reduce((s, r) => s + r.hire_rate_pct, 0) / data.length) * 10) / 10;
-  const aboveNormal = data.filter((r) => r.hire_rate_pct > FIXED_NORMAL).length;
-  const belowMin = data.filter((r) => r.hire_rate_pct < FIXED_MIN).length;
-  const atMax = data.filter((r) => r.hire_rate_pct >= FIXED_MAX).length;
-  return { avgRate, aboveNormal, belowMin, atMax };
+  if (data.length === 0) return { avgRate: '0', aboveNormal: 0, belowLow: 0, atMax: 0 };
+  const rates = data.map((r) => (r.leads > 0 ? (r.hired_by_leadbase / r.leads) * 100 : 0));
+  const avgRate = (rates.reduce((s, v) => s + v, 0) / rates.length).toFixed(1);
+  const aboveNormal = rates.filter((v) => v > FIXED_NORMAL).length;
+  const belowLow = rates.filter((v) => v < FIXED_LOW).length;
+  const atMax = rates.filter((v) => v >= FIXED_MAX).length;
+  return { avgRate, aboveNormal, belowLow, atMax };
 }
 
-export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
+export default function LeadBaseBandsChart({ data }: { data: LeadsDataRow[] }) {
   const labels = data.map((r) => r.month);
+  const lbRate = data.map((r) =>
+    r.leads > 0 ? Math.round((r.hired_by_leadbase / r.leads) * 1000) / 10 : 0
+  );
   const stats = computeStats(data);
 
   const chartData = {
@@ -71,8 +75,8 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         },
       },
       {
-        label: 'Min',
-        data: data.map(() => FIXED_MIN),
+        label: 'Low',
+        data: data.map(() => FIXED_LOW),
         borderColor: '#E24B4A',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
@@ -81,13 +85,13 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         tension: 0,
       },
       {
-        label: 'Current',
-        data: data.map((r) => r.hire_rate_pct),
-        borderColor: '#534AB7',
+        label: 'Lead Base rate',
+        data: lbRate,
+        borderColor: '#185FA5',
         backgroundColor: 'transparent',
         borderWidth: 2.5,
         pointRadius: 4,
-        pointBackgroundColor: '#534AB7',
+        pointBackgroundColor: '#185FA5',
         pointBorderColor: '#fff',
         pointBorderWidth: 1.5,
         tension: 0.25,
@@ -105,17 +109,17 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         callbacks: {
           label: (ctx: TooltipItem<'line'>) => {
             const val = ctx.parsed.y ?? 0;
-            if (ctx.dataset.label === 'Current') return ` Current hire rate: ${Number(val).toFixed(1)}%`;
+            if (ctx.dataset.label === 'Lead Base rate') return ` Lead Base hire rate: ${Number(val).toFixed(1)}%`;
             if (ctx.dataset.label === 'Max') return ` Max: ${FIXED_MAX}%`;
             if (ctx.dataset.label === 'Normal') return ` Normal: ${FIXED_NORMAL}% (standard)`;
-            if (ctx.dataset.label === 'Min') return ` Min: ${FIXED_MIN}%`;
+            if (ctx.dataset.label === 'Low') return ` Low: ${FIXED_LOW}% (min)`;
             return ` ${ctx.dataset.label}: ${val}%`;
           },
           afterBody: (items: TooltipItem<'line'>[]) => {
             if (!items.length) return [];
             const row = data[items[0].dataIndex];
             if (!row) return [];
-            return ['', ` Hired: ${row.hired} drivers`, ` Total leads: ${row.leads}`];
+            return ['', ` Hired via Lead Base: ${row.hired_by_leadbase}`, ` Total leads: ${row.leads}`];
           },
         },
       },
@@ -136,9 +140,9 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
   };
 
   const pills = [
-    { label: 'Avg hire rate', value: `${stats.avgRate}%` },
+    { label: 'Avg Lead Base rate', value: `${stats.avgRate}%` },
     { label: 'Months above normal', value: String(stats.aboveNormal) },
-    { label: 'Months below min', value: String(stats.belowMin) },
+    { label: 'Months below low', value: String(stats.belowLow) },
     { label: 'Months at max', value: String(stats.atMax) },
   ];
 
@@ -146,10 +150,10 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
-          Performance bands — hire rate (all sources) vs targets
+          Performance bands — hire rate (Lead Base) vs targets
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
-          Max 15% / Normal 7% / Min 4% + actual hire rate (Leads + Lead Base + Referral)
+          Max 5% / Normal 2% / Low 1% + actual hire rate from Lead Base
         </div>
       </div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -170,13 +174,13 @@ export default function HireRateBandsChart({ data }: { data: LeadsDataRow[] }) {
         {pills.map((pill) => (
           <div key={pill.label} style={{
             flex: '1 1 120px',
-            background: 'rgba(83, 74, 183, 0.08)',
-            border: '0.5px solid #c5c2f0',
+            background: 'rgba(24, 95, 165, 0.08)',
+            border: '0.5px solid #b8d4f0',
             borderRadius: 8,
             padding: '6px 10px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#534AB7', lineHeight: 1.2 }}>{pill.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#185FA5', lineHeight: 1.2 }}>{pill.value}</div>
             <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, lineHeight: 1.3 }}>{pill.label}</div>
           </div>
         ))}
