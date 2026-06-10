@@ -15,6 +15,7 @@ import AdSpendChart from './AdSpendChart';
 import HireRateSummaryCard from './HireRateSummaryCard';
 import HireRateBreakdownCard from './HireRateBreakdownCard';
 import HiresBySourceChart from './HiresBySourceChart';
+import MonthOverMonthCard from './MonthOverMonthCard';
 
 const CARD_STYLE: React.CSSProperties = {
   background: '#f0faf5',
@@ -52,54 +53,30 @@ function SkeletonCard({ height = 120 }: { height?: number }) {
 function ErrorState({ message, onRetry, retrying }: { message: string; onRetry: () => void; retrying: boolean }) {
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100%',
-      gap: 12,
-      padding: 24,
-      textAlign: 'center',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      height: '100%', gap: 12, padding: 24, textAlign: 'center',
     }}>
       <div style={{ fontSize: 32 }}>⚠️</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>Failed to load dashboard data</div>
       <div style={{
-        fontSize: 12,
-        color: '#6b7280',
-        maxWidth: 380,
-        lineHeight: 1.6,
-        fontFamily: 'monospace',
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: 6,
-        padding: '8px 12px',
+        fontSize: 12, color: '#6b7280', maxWidth: 380, lineHeight: 1.6,
+        fontFamily: 'monospace', background: '#f8fafc', border: '1px solid #e2e8f0',
+        borderRadius: 6, padding: '8px 12px',
       }}>
         {message}
       </div>
-      <button
-        onClick={onRetry}
-        disabled={retrying}
-        style={{
-          padding: '8px 20px',
-          background: retrying ? '#9ca3af' : '#1D9E75',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: retrying ? 'not-allowed' : 'pointer',
-        }}
-      >
+      <button onClick={onRetry} disabled={retrying} style={{
+        padding: '8px 20px', background: retrying ? '#9ca3af' : '#1D9E75',
+        color: '#fff', border: 'none', borderRadius: 8, fontSize: 13,
+        fontWeight: 600, cursor: retrying ? 'not-allowed' : 'pointer',
+      }}>
         {retrying ? 'Retrying…' : 'Retry'}
       </button>
     </div>
   );
 }
 
-interface Props {
-  data: LeadsDataRow[];
-  error?: string;
-}
+interface Props { data: LeadsDataRow[]; error?: string; }
 
 export default function DashboardContent({ data, error }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -107,16 +84,13 @@ export default function DashboardContent({ data, error }: Props) {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => { setMounted(true); }, []);
-
-  function handleRetry() {
-    startTransition(() => { router.refresh(); });
-  }
+  function handleRetry() { startTransition(() => { router.refresh(); }); }
 
   return (
     <>
       <style>{`
         @keyframes skeleton-pulse {
-          0% { background-position: 200% 0; }
+          0%   { background-position: 200% 0; }
           100% { background-position: -200% 0; }
         }
         .leads-dashboard {
@@ -128,9 +102,10 @@ export default function DashboardContent({ data, error }: Props) {
           gap: 12px;
           box-sizing: border-box;
         }
+        /* KPI row: summary | breakdown | month-over-month */
         .leads-kpi-row {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr 1fr 1fr;
           gap: 12px;
         }
         .leads-bottom-row {
@@ -138,37 +113,42 @@ export default function DashboardContent({ data, error }: Props) {
           grid-template-columns: 1fr 1fr;
           gap: 12px;
         }
+        @media (max-width: 900px) {
+          .leads-kpi-row    { grid-template-columns: 1fr 1fr; }
+        }
         @media (max-width: 768px) {
-          .leads-dashboard {
-            padding: 12px;
-          }
+          .leads-dashboard  { padding: 12px; }
           .leads-kpi-row,
-          .leads-bottom-row {
-            grid-template-columns: 1fr;
-          }
+          .leads-bottom-row { grid-template-columns: 1fr; }
         }
       `}</style>
       <div className="leads-dashboard">
         {!mounted ? (
           <>
             <div className="leads-kpi-row">
-              <SkeletonCard height={120} />
-              <SkeletonCard height={120} />
+              <SkeletonCard height={220} />
+              <SkeletonCard height={220} />
+              <SkeletonCard height={220} />
             </div>
             <SkeletonCard height={380} />
+            <SkeletonCard height={420} />
             <div className="leads-bottom-row">
-              <SkeletonCard height={380} />
-              <SkeletonCard height={380} />
+              <SkeletonCard height={400} />
+              <SkeletonCard height={400} />
             </div>
             <div className="leads-bottom-row">
-              <SkeletonCard height={380} />
-              <SkeletonCard height={380} />
+              <SkeletonCard height={400} />
+              <SkeletonCard height={400} />
             </div>
             <div className="leads-bottom-row">
-              <SkeletonCard height={360} />
-              <SkeletonCard height={360} />
+              <SkeletonCard height={400} />
+              <SkeletonCard height={400} />
             </div>
-            <SkeletonCard height={380} />
+            <div className="leads-bottom-row">
+              <SkeletonCard height={400} />
+              <SkeletonCard height={400} />
+            </div>
+            <SkeletonCard height={360} />
           </>
         ) : error ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -176,7 +156,7 @@ export default function DashboardContent({ data, error }: Props) {
           </div>
         ) : (
           <>
-            {/* Headline KPIs — lead volume conversion, then hiring-rate composition */}
+            {/* ── Row 1: KPI summary · breakdown · month-over-month ── */}
             <div className="leads-kpi-row">
               <div style={CARD_STYLE}>
                 <HireRateSummaryCard data={data} />
@@ -184,50 +164,59 @@ export default function DashboardContent({ data, error }: Props) {
               <div style={CARD_STYLE}>
                 <HireRateBreakdownCard data={data} />
               </div>
+              <div style={{ ...CARD_STYLE, minHeight: 220 }}>
+                <MonthOverMonthCard data={data} />
+              </div>
             </div>
-            {/* Performance Bands — Leads (full width) */}
+
+            {/* ── Row 2: Leads performance bands — full width ── */}
             <div style={{ ...CARD_STYLE, height: 380 }}>
               <PerformanceBandsChart data={data} />
             </div>
-            {/* Hire Rate Bands — Leads Only (left) & All Sources (right) */}
+
+            {/* ── Row 3: Hire rate all sources — full width ── */}
+            <div style={{ ...CARD_STYLE, height: 420 }}>
+              <HireRateBandsChart data={data} />
+            </div>
+
+            {/* ── Row 4: Hire rate Leads Only | Lead Base — side by side ── */}
             <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <HireRateLeadsOnlyBandsChart data={data} />
               </div>
               <div style={{ ...CARD_STYLE, height: 400 }}>
-                <HireRateBandsChart data={data} />
-              </div>
-            </div>
-            {/* Lead Base Bands & Spending Bands */}
-            <div className="leads-bottom-row">
-              <div style={{ ...CARD_STYLE, height: 400 }}>
                 <LeadBaseBandsChart data={data} />
               </div>
+            </div>
+
+            {/* ── Row 5: Spending bands | Cost per hire leads ── */}
+            <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <SpendingBandsChart data={data} />
               </div>
-            </div>
-            {/* Cost Per Hire — Leads Only (left) & Overall (right) */}
-            <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <CostPerHireChart data={data} />
               </div>
+            </div>
+
+            {/* ── Row 6: Overall CPH | Hires by source ── */}
+            <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <OverallCostPerHireChart data={data} />
               </div>
-            </div>
-            {/* Hires by Source & Ad spend with bands */}
-            <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <HiresBySourceChart data={data} />
               </div>
+            </div>
+
+            {/* ── Row 7: Ad spend · hire rate | Leads & hire rate detail ── */}
+            <div className="leads-bottom-row">
               <div style={{ ...CARD_STYLE, height: 400 }}>
                 <AdSpendChart data={data} />
               </div>
-            </div>
-            {/* Leads & hire rate detail */}
-            <div style={{ ...CARD_STYLE, height: 360 }}>
-              <LeadsHireRateChart data={data} />
+              <div style={{ ...CARD_STYLE, height: 400 }}>
+                <LeadsHireRateChart data={data} />
+              </div>
             </div>
           </>
         )}
