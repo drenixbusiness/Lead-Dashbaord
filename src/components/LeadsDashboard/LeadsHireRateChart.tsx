@@ -63,12 +63,12 @@ export default function LeadsHireRateChart({ data }: { data: LeadsDataRow[] }) {
       tooltip: {
         callbacks: {
           label: (ctx: TooltipItem<'bar' | 'line'>) => {
-            const val = Math.round(ctx.parsed.y ?? 0);
             if (ctx.dataset.label === 'Hire rate %') {
+              const val = Number(ctx.parsed.y ?? 0).toFixed(1);
               const hired = data[ctx.dataIndex]?.hired ?? 0;
               return ` Hire rate: ${val}% (${hired} hired)`;
             }
-            return ` Leads: ${val}`;
+            return ` Leads: ${Math.round(ctx.parsed.y ?? 0)}`;
           },
         },
       },
@@ -92,7 +92,7 @@ export default function LeadsHireRateChart({ data }: { data: LeadsDataRow[] }) {
         position: 'right' as const,
         ticks: {
           font: { size: 10, family: '"Google Sans", Arial, sans-serif' },
-          callback: (v: number | string) => `${Math.round(Number(v))}%`,
+          callback: (v: number | string) => `${Number(v).toFixed(1)}%`,
         },
         grid: { drawOnChartArea: false },
       },
