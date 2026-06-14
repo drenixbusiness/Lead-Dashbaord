@@ -16,6 +16,7 @@ import HireRateSummaryCard from './HireRateSummaryCard';
 import HireRateBreakdownCard from './HireRateBreakdownCard';
 import HiresBySourceChart from './HiresBySourceChart';
 import MonthOverMonthCard from './MonthOverMonthCard';
+import ForecastCard from './ForecastCard';
 
 const CARD_STYLE: React.CSSProperties = {
   background: '#f0faf5',
@@ -169,7 +170,12 @@ export default function DashboardContent({ data, error }: Props) {
               </div>
             </div>
 
-            {/* ── Row 2: Leads performance bands — full width ── */}
+            {/* ── Row 2: 3-month forecast — full width ── */}
+            <div style={{ ...CARD_STYLE, minHeight: 200 }}>
+              <ForecastCard data={data} />
+            </div>
+
+            {/* ── Row 3: Leads performance bands — full width ── */}
             <div style={{ ...CARD_STYLE, height: 380 }}>
               <PerformanceBandsChart data={data} />
             </div>

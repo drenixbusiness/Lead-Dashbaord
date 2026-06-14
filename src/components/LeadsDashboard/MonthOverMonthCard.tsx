@@ -15,38 +15,42 @@ interface MonthData {
   overallRate: string;
   adSpend: string;
   cphLeads: string;
+  cphLB: string;
 }
 
 function buildRow(r: LeadsDataRow): MonthData {
-  const leadsRate   = r.leads > 0 ? ((r.hired_by_leads / r.leads) * 100).toFixed(1) : '0.0';
-  const lbRate      = r.leads > 0 ? ((r.hired_by_leadbase / r.leads) * 100).toFixed(1) : '0.0';
-  const cphLeads    = r.hired_by_leads > 0 ? `$${Math.round(r.ad_spend_usd / r.hired_by_leads).toLocaleString()}` : '—';
+  const leadsRate = r.leads > 0 ? ((r.hired_by_leads / r.leads) * 100).toFixed(1) : '0.0';
+  const lbRate    = r.leads > 0 ? ((r.hired_by_leadbase / r.leads) * 100).toFixed(1) : '0.0';
+  const cphLeads  = r.hired_by_leads    > 0 ? `$${Math.round(r.ad_spend_usd / r.hired_by_leads).toLocaleString()}`    : '—';
+  const cphLB     = r.hired_by_leadbase > 0 ? `$${Math.round(r.ad_spend_usd / r.hired_by_leadbase).toLocaleString()}` : '—';
   return {
-    month:        r.month,
-    leads:        r.leads,
-    hiredLeads:   r.hired_by_leads,
-    hiredLB:      r.hired_by_leadbase,
-    hiredRef:     r.hired_by_referral,
-    totalHired:   r.hired,
-    leadsRate:    `${leadsRate}%`,
-    lbRate:       `${lbRate}%`,
-    overallRate:  `${r.hire_rate_pct.toFixed(1)}%`,
-    adSpend:      `$${r.ad_spend_usd.toLocaleString()}`,
+    month:       r.month,
+    leads:       r.leads,
+    hiredLeads:  r.hired_by_leads,
+    hiredLB:     r.hired_by_leadbase,
+    hiredRef:    r.hired_by_referral,
+    totalHired:  r.hired,
+    leadsRate:   `${leadsRate}%`,
+    lbRate:      `${lbRate}%`,
+    overallRate: `${r.hire_rate_pct.toFixed(1)}%`,
+    adSpend:     `$${r.ad_spend_usd.toLocaleString()}`,
     cphLeads,
+    cphLB,
   };
 }
 
 const METRICS: { key: keyof MonthData; label: string; accent?: string }[] = [
-  { key: 'leads',       label: 'Total leads',            accent: '#185FA5' },
-  { key: 'hiredLeads',  label: 'Hired — Leads',          accent: '#1D9E75' },
-  { key: 'hiredLB',     label: 'Hired — Lead Base',      accent: '#185FA5' },
-  { key: 'hiredRef',    label: 'Hired — Referral',       accent: '#BA7517' },
-  { key: 'totalHired',  label: 'Total hired',            accent: '#085041' },
+  { key: 'leads',       label: 'Total leads',                accent: '#185FA5' },
+  { key: 'hiredLeads',  label: 'Hired — Leads',              accent: '#1D9E75' },
+  { key: 'hiredLB',     label: 'Hired — Lead Base',          accent: '#185FA5' },
+  { key: 'hiredRef',    label: 'Hired — Referral',           accent: '#BA7517' },
+  { key: 'totalHired',  label: 'Total hired',                accent: '#085041' },
   { key: 'leadsRate',   label: 'Hire rate (leads only)',      accent: '#185FA5' },
   { key: 'lbRate',      label: 'Hire rate (Lead Base only)', accent: '#185FA5' },
   { key: 'overallRate', label: 'Overall hire rate',           accent: '#534AB7' },
-  { key: 'adSpend',     label: 'Ad spend',               accent: '#BA7517' },
-  { key: 'cphLeads',    label: 'CPH (leads only)',        accent: '#E24B4A' },
+  { key: 'adSpend',     label: 'Ad spend',                   accent: '#BA7517' },
+  { key: 'cphLeads',    label: 'CPH (leads only)',            accent: '#E24B4A' },
+  { key: 'cphLB',       label: 'CPH (Lead Base only)',        accent: '#185FA5' },
 ];
 
 export default function MonthDataCard({ data }: { data: LeadsDataRow[] }) {
