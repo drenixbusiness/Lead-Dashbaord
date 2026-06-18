@@ -8,11 +8,5 @@ export const metadata = {
 
 export default async function Home() {
   const { data, error } = await fetchLeadsData();
-  return (
-    <div className="p-5">
-      <Header />
-      <DashboardContent data={data} error={error}
-      />
-    </div>
-  );
+  return <DashboardContent data={data} error={error} />;
 }
