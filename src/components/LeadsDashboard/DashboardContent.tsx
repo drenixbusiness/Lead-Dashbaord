@@ -146,9 +146,9 @@ function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
-interface Props { data: LeadsDataRow[]; error?: string; }
+interface Props { data: LeadsDataRow[]; error?: string; company?: string; }
 
-export default function DashboardContent({ data, error }: Props) {
+export default function DashboardContent({ data, error, company = 'JM' }: Props) {
   const [mounted, setMounted]       = useState(false);
   const [active, setActive]         = useState<SectionId>('overview');
   const [sidebarOpen, setSidebar]   = useState(true);
@@ -358,8 +358,8 @@ export default function DashboardContent({ data, error }: Props) {
         {/* ── Sidebar ── */}
         <nav className={`db-sidebar${sidebarOpen ? '' : ' collapsed'}`}>
           <div className="db-sidebar-logo">
-            <div className="db-sidebar-logo-mark">JM</div>
-            <div className="db-sidebar-logo-text">Lead Analytics</div>
+            <div className="db-sidebar-logo-mark">{company}</div>
+            <div className="db-sidebar-logo-text">{company} Lead Analytics</div>
           </div>
 
           <div className="db-nav">
@@ -395,11 +395,11 @@ export default function DashboardContent({ data, error }: Props) {
           <div className="db-topbar">
             <button className="db-toggle-btn" onClick={() => setSidebar((v) => !v)}>☰</button>
             <div className="db-breadcrumb">
-              <span>JM Lead Analytics</span>
+              <span>{company} Lead Analytics</span>
               <span className="db-breadcrumb-sep">/</span>
               <span className="db-breadcrumb-active">{activeSection.label}</span>
             </div>
-            <div className="db-topbar-title">JM — Lead Analytics</div>
+            <div className="db-topbar-title">{company} — Lead Analytics</div>
           </div>
 
           {/* Main */}
