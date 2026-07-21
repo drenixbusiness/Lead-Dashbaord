@@ -155,118 +155,130 @@ function ErrorState({ message, onRetry, retrying }: { message: string; onRetry: 
   );
 }
 
+// ── KPI row helper ────────────────────────────────────────────────────────────
+type KPICardProps = React.ComponentProps<typeof KPICard>;
+function KPIRow({ cards }: { cards: KPICardProps[] }) {
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:`repeat(${cards.length},1fr)`, gap:14, marginBottom:16 }}>
+      {cards.map((c, i) => <KPICard key={i} {...c} delay={i * 80} />)}
+    </div>
+  );
+}
+
 // ── Section content ───────────────────────────────────────────────────────────
 function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
   const grid2: React.CSSProperties = { display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 };
 
-  // KPI aggregates for overview
-  const totalLeads     = data.reduce((s, r) => s + r.leads, 0);
-  const totalHired     = data.reduce((s, r) => s + r.hired_by_leads, 0);
-  const totalSpend     = data.reduce((s, r) => s + r.ad_spend_usd, 0);
-  const hireRate       = totalLeads > 0 ? (totalHired / totalLeads) * 100 : 0;
-  const costPerHire    = totalHired > 0 ? totalSpend / totalHired : 0;
-  const range          = data.length > 0 ? `${data[0].month} – ${data[data.length - 1].month}` : '';
+  // Shared aggregates used across sections
+  const totalLeads    = data.reduce((s, r) => s + r.leads, 0);
+  const totalHired    = data.reduce((s, r) => s + r.hired, 0);
+  const fromLeads     = data.reduce((s, r) => s + r.hired_by_leads, 0);
+  const fromLeadBase  = data.reduce((s, r) => s + r.hired_by_leadbase, 0);
+  const fromReferral  = data.reduce((s, r) => s + r.hired_by_referral, 0);
+  const totalSpend    = data.reduce((s, r) => s + r.ad_spend_usd, 0);
+  const overallRate   = totalLeads > 0 ? (totalHired / totalLeads) * 100 : 0;
+  const leadsOnlyRate = totalLeads > 0 ? (fromLeads / totalLeads) * 100 : 0;
+  const leadBaseRate  = totalLeads > 0 ? (fromLeadBase / totalLeads) * 100 : 0;
+  const costPerHire   = fromLeads > 0 ? totalSpend / fromLeads : 0;
+  const avgLeads      = data.length > 0 ? totalLeads / data.length : 0;
+  const range         = data.length > 0 ? `${data[0].month} – ${data[data.length - 1].month}` : '';
+
+  // Peak month
+  const peakRow = data.reduce((best, r) => r.leads > best.leads ? r : best, data[0] ?? { leads: 0, month: '—' } as LeadsDataRow);
+
+  // Month-over-month lead change
+  const last2   = data.slice(-2);
+  const momLeads = last2.length === 2 && last2[0].leads > 0
+    ? ((last2[1].leads - last2[0].leads) / last2[0].leads) * 100 : 0;
+
+  // Simple next-month weighted forecast from last 3 months
+  const recent3  = data.slice(-3);
+  const W3       = [0.2, 0.35, 0.45];
+  const wAvg3    = (vals: number[]) => vals.reduce((s, v, i) => s + v * (W3[i] ?? 0), 0);
+  const foreLeads  = Math.round(wAvg3(recent3.map(r => r.leads)));
+  const foreRate   = wAvg3(recent3.map(r => r.hire_rate_pct));
+  const foreHired  = Math.round((foreLeads * foreRate) / 100);
+  const foreSpend  = Math.round(wAvg3(recent3.map(r => r.ad_spend_usd)));
 
   switch (id) {
     case 'overview':
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          {/* Hero KPI row */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
-            <KPICard
-              label="Total Leads" value={totalLeads} sub={range}
-              gradient="linear-gradient(135deg,#6d28d9 0%,#8b5cf6 100%)"
-              icon="👤" delay={0}
-            />
-            <KPICard
-              label="Total Hires" value={totalHired} sub="from leads"
-              gradient="linear-gradient(135deg,#065f46 0%,#059669 100%)"
-              icon="✅" delay={80}
-            />
-            <KPICard
-              label="Hire Rate" value={hireRate} suffix="%" decimals={1} sub="leads → hire"
-              gradient="linear-gradient(135deg,#1e40af 0%,#3b82f6 100%)"
-              icon="📈" delay={160}
-            />
-            <KPICard
-              label="Avg Cost / Hire" value={costPerHire} prefix="$" decimals={0} sub="ad spend / hires"
-              gradient="linear-gradient(135deg,#92400e 0%,#f59e0b 100%)"
-              icon="💰" delay={240}
-            />
-          </div>
-
-          {/* Detail cards */}
+          <KPIRow cards={[
+            { label:'Total Leads',     value:totalLeads,  sub:range,              gradient:'linear-gradient(135deg,#6d28d9,#8b5cf6)', icon:'👤' },
+            { label:'Total Hires',     value:totalHired,  sub:'all sources',      gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'✅' },
+            { label:'Hire Rate',       value:overallRate, suffix:'%', decimals:1, sub:'leads → hire',     gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'📈' },
+            { label:'Avg Cost / Hire', value:costPerHire, prefix:'$', decimals:0, sub:'ad spend / hires', gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'💰' },
+          ]} />
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16 }}>
-            <div style={{ ...CARD, animation:'fadeSlideIn 0.5s ease 0.3s both' }}>
-              <HireRateSummaryCard data={data} />
-            </div>
-            <div style={{ ...CARD, animation:'fadeSlideIn 0.5s ease 0.38s both' }}>
-              <HireRateBreakdownCard data={data} />
-            </div>
-            <div style={{ ...CARD, minHeight:220, animation:'fadeSlideIn 0.5s ease 0.46s both' }}>
-              <MonthOverMonthCard data={data} />
-            </div>
+            <div style={{ ...CARD, animation:'fadeSlideIn 0.5s ease 0.3s both' }}><HireRateSummaryCard data={data} /></div>
+            <div style={{ ...CARD, animation:'fadeSlideIn 0.5s ease 0.38s both' }}><HireRateBreakdownCard data={data} /></div>
+            <div style={{ ...CARD, minHeight:220, animation:'fadeSlideIn 0.5s ease 0.46s both' }}><MonthOverMonthCard data={data} /></div>
           </div>
         </div>
       );
 
     case 'forecast':
       return (
-        <div style={{ ...CARD, minHeight:200, animation:'fadeSlideIn 0.4s ease both' }}>
-          <ForecastCard data={data} />
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <KPIRow cards={[
+            { label:'Projected Leads',    value:foreLeads,  sub:'next month est.',    gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'🔮' },
+            { label:'Projected Hires',    value:foreHired,  sub:'based on avg rate',  gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'🎯' },
+            { label:'Projected Rate',     value:foreRate,   suffix:'%', decimals:1, sub:'hire rate forecast', gradient:'linear-gradient(135deg,#1e40af,#2563eb)', icon:'📊' },
+            { label:'Projected Ad Spend', value:foreSpend,  prefix:'$', decimals:0, sub:'based on trend',    gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', icon:'📣' },
+          ]} />
+          <div style={{ ...CARD, minHeight:200, animation:'fadeSlideIn 0.4s ease both' }}><ForecastCard data={data} /></div>
         </div>
       );
 
     case 'performance':
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease both' }}>
-            <PerformanceBandsChart data={data} />
-          </div>
-          <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
-            <HireRateBandsChart data={data} />
-          </div>
-          <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
-            <LeadsHireRateChart data={data} />
-          </div>
+          <KPIRow cards={[
+            { label:'Total Leads',  value:totalLeads,          sub:range,                          gradient:'linear-gradient(135deg,#6d28d9,#8b5cf6)', icon:'👤' },
+            { label:'Avg / Month',  value:avgLeads, decimals:0, sub:'monthly average',              gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'📅' },
+            { label:'Peak Month',   value:peakRow.leads,        sub:peakRow.month,                  gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'🏆' },
+            { label:`MoM ${momLeads >= 0 ? '▲' : '▼'} Change`, value:Math.abs(momLeads), suffix:'%', decimals:1, sub:'vs previous month', gradient:momLeads >= 0 ? 'linear-gradient(135deg,#065f46,#059669)' : 'linear-gradient(135deg,#7f1d1d,#dc2626)', icon:momLeads >= 0 ? '📈' : '📉' },
+          ]} />
+          <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease both' }}><PerformanceBandsChart data={data} /></div>
+          <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease 0.1s both' }}><HireRateBandsChart data={data} /></div>
+          <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.2s both' }}><LeadsHireRateChart data={data} /></div>
         </div>
       );
 
     case 'hire-rates':
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <KPIRow cards={[
+            { label:'Overall Hire Rate',  value:overallRate,   suffix:'%', decimals:1, sub:'all hires / all leads',   gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'📊' },
+            { label:'Leads-Only Rate',    value:leadsOnlyRate, suffix:'%', decimals:1, sub:'lead channel only',       gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'🎯' },
+            { label:'Lead Base Rate',     value:leadBaseRate,  suffix:'%', decimals:1, sub:'lead base channel',       gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'📋' },
+            { label:'Referral Hires',     value:fromReferral,              sub:`${totalHired > 0 ? ((fromReferral/totalHired)*100).toFixed(0) : 0}% of total hires`, gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'🤝' },
+          ]} />
           <div style={grid2}>
-            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease both' }}>
-              <HireRateLeadsOnlyBandsChart data={data} />
-            </div>
-            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
-              <LeadBaseBandsChart data={data} />
-            </div>
+            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease both' }}><HireRateLeadsOnlyBandsChart data={data} /></div>
+            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}><LeadBaseBandsChart data={data} /></div>
           </div>
-          <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
-            <HireRateBySourceChart />
-          </div>
+          <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.2s both' }}><HireRateBySourceChart /></div>
         </div>
       );
 
     case 'cost-spend':
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <KPIRow cards={[
+            { label:'Total Ad Spend',    value:totalSpend,                                      prefix:'$', decimals:0, sub:range,                gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', icon:'💸' },
+            { label:'Cost per Hire',     value:costPerHire,                                     prefix:'$', decimals:0, sub:'leads channel only', gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'💰' },
+            { label:'Avg Monthly Spend', value:data.length > 0 ? totalSpend/data.length : 0,   prefix:'$', decimals:0, sub:'per month',          gradient:'linear-gradient(135deg,#1e3a8a,#1d4ed8)', icon:'📣' },
+            { label:'Hires from Leads',  value:fromLeads,                                                               sub:`of ${totalHired} total hires`, gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'✅' },
+          ]} />
           <div style={grid2}>
-            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease both' }}>
-              <SpendingBandsChart data={data} />
-            </div>
-            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
-              <AdSpendChart data={data} />
-            </div>
+            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease both' }}><SpendingBandsChart data={data} /></div>
+            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}><AdSpendChart data={data} /></div>
           </div>
           <div style={grid2}>
-            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
-              <CostPerHireChart data={data} />
-            </div>
-            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.3s both' }}>
-              <OverallCostPerHireChart data={data} />
-            </div>
+            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.2s both' }}><CostPerHireChart data={data} /></div>
+            <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.3s both' }}><OverallCostPerHireChart data={data} /></div>
           </div>
         </div>
       );
@@ -274,12 +286,14 @@ function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
     case 'sources':
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-          <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease both' }}>
-            <HiresBySourceChart data={data} />
-          </div>
-          <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
-            <HireRateBySourceChart />
-          </div>
+          <KPIRow cards={[
+            { label:'Total Hires',     value:totalHired,   sub:'all sources combined',                                                               gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'✅' },
+            { label:'From Leads',      value:fromLeads,    sub:`${totalHired > 0 ? ((fromLeads/totalHired)*100).toFixed(0) : 0}% of total`,          gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'👤' },
+            { label:'From Lead Base',  value:fromLeadBase, sub:`${totalHired > 0 ? ((fromLeadBase/totalHired)*100).toFixed(0) : 0}% of total`,       gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'📋' },
+            { label:'From Referral',   value:fromReferral, sub:`${totalHired > 0 ? ((fromReferral/totalHired)*100).toFixed(0) : 0}% of total`,       gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'🤝' },
+          ]} />
+          <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease both' }}><HiresBySourceChart data={data} /></div>
+          <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}><HireRateBySourceChart /></div>
         </div>
       );
   }
