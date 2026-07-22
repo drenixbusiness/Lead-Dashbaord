@@ -20,6 +20,8 @@ import MonthOverMonthCard from './MonthOverMonthCard';
 import ForecastCard from './ForecastCard';
 import WorkforceMovementChart from './WorkforceMovementChart';
 import TenureDistributionChart from './TenureDistributionChart';
+import HRHiresChart from './HRHiresChart';
+import type { HRMonthData } from '../../types/hr';
 
 // ── Card style ────────────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
@@ -169,7 +171,7 @@ function KPIRow({ cards }: { cards: KPICardProps[] }) {
 }
 
 // ── Section content ───────────────────────────────────────────────────────────
-function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
+function SectionContent({ id, data, hrData }: { id: SectionId; data: LeadsDataRow[]; hrData: HRMonthData[] }) {
   const grid2: React.CSSProperties = { display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 };
 
   // Shared aggregates used across sections
@@ -301,33 +303,34 @@ function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
       );
 
     case 'workforce': {
-      // Static workforce data aggregates
-      const WF = [
-        { month:'Jan', onboarded:14, departed:3,  headcount:26 },
-        { month:'Feb', onboarded:13, departed:5,  headcount:33 },
-        { month:'Mar', onboarded:14, departed:10, headcount:32 },
-        { month:'Apr', onboarded:14, departed:7,  headcount:43 },
-        { month:'May', onboarded:15, departed:24, headcount:42 },
-        { month:'Jun', onboarded:13, departed:9,  headcount:45 },
-      ];
-      const currentHeadcount  = WF[WF.length - 1].headcount;
-      const totalOnboarded    = WF.reduce((s, r) => s + r.onboarded, 0);
-      const totalDeparted     = WF.reduce((s, r) => s + r.departed, 0);
-      const netGrowth         = currentHeadcount - WF[0].headcount;
-      const retentionRate     = totalOnboarded > 0 ? ((totalOnboarded - totalDeparted) / totalOnboarded) * 100 : 0;
+      // Live HR data aggregates
+      const totalHiredHR  = hrData.reduce((s, m) => s + m.total, 0);
+      const hrTotals: Record<string, number> = {};
+      for (const m of hrData) {
+        for (const [hr, n] of Object.entries(m.hires)) {
+          hrTotals[hr] = (hrTotals[hr] ?? 0) + n;
+        }
+      }
+      const topHR     = Object.entries(hrTotals).sort((a, b) => b[1] - a[1])[0];
+      const numMonths = hrData.length;
+      const avgPerMonth = numMonths > 0 ? totalHiredHR / numMonths : 0;
+
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <KPIRow cards={[
-            { label:'Active Headcount', value:currentHeadcount,  sub:'current (Jun 2026)',           gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'🚛' },
-            { label:'Total Onboarded',  value:totalOnboarded,    sub:'Jan – Jun 2026',               gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'✅' },
-            { label:'Total Departed',   value:totalDeparted,     sub:'Jan – Jun 2026',               gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', icon:'📤' },
-            { label:'Net Growth',       value:netGrowth,         sub:'Jan → Jun headcount change',   gradient:netGrowth >= 0 ? 'linear-gradient(135deg,#065f46,#059669)' : 'linear-gradient(135deg,#7f1d1d,#dc2626)', icon: netGrowth >= 0 ? '📈' : '📉' },
+            { label:'Total Hires (HR)',  value:totalHiredHR,  sub:'Jan – Jun 2026 · all reps',    gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'✅' },
+            { label:'Top HR Rep',        value:topHR?.[1] ?? 0, sub:topHR?.[0] ?? '—',            gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'🏆' },
+            { label:'Avg Hires / Month', value:avgPerMonth,   decimals:1, sub:'company average',  gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'📅' },
+            { label:'HR Reps Active',    value:Object.keys(hrTotals).length, sub:'across all months', gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'👥' },
           ]} />
+          <div style={{ ...CARD, height:480, animation:'fadeSlideIn 0.4s ease both' }}>
+            <HRHiresChart data={hrData} />
+          </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-            <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease both' }}>
+            <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
               <WorkforceMovementChart />
             </div>
-            <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
+            <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
               <TenureDistributionChart />
             </div>
           </div>
@@ -338,9 +341,9 @@ function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-interface Props { data: LeadsDataRow[]; error?: string; company?: string; }
+interface Props { data: LeadsDataRow[]; error?: string; company?: string; hrData?: HRMonthData[]; }
 
-export default function DashboardContent({ data, error, company = 'JM' }: Props) {
+export default function DashboardContent({ data, error, company = 'JM', hrData = [] }: Props) {
   const [mounted, setMounted]        = useState(false);
   const [active, setActive]          = useState<SectionId>('overview');
   const [sidebarOpen, setSidebar]    = useState(true);
@@ -691,7 +694,7 @@ export default function DashboardContent({ data, error, company = 'JM' }: Props)
                     <p>{activeSection.desc}{range ? ` · ${range}` : ''}</p>
                   </div>
                 </div>
-                <SectionContent id={active} data={data} />
+                <SectionContent id={active} data={data} hrData={hrData} />
               </>
             )}
           </main>
