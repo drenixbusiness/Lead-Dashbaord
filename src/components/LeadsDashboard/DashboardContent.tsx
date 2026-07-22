@@ -18,6 +18,8 @@ import HiresBySourceChart from './HiresBySourceChart';
 import HireRateBySourceChart from './HireRateBySourceChart';
 import MonthOverMonthCard from './MonthOverMonthCard';
 import ForecastCard from './ForecastCard';
+import WorkforceMovementChart from './WorkforceMovementChart';
+import TenureDistributionChart from './TenureDistributionChart';
 
 // ── Card style ────────────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
@@ -33,15 +35,16 @@ const CARD: React.CSSProperties = {
 };
 
 // ── Sidebar sections ──────────────────────────────────────────────────────────
-type SectionId = 'overview' | 'forecast' | 'performance' | 'hire-rates' | 'cost-spend' | 'sources';
+type SectionId = 'overview' | 'forecast' | 'performance' | 'hire-rates' | 'cost-spend' | 'sources' | 'workforce';
 
 const SECTIONS: { id: SectionId; label: string; icon: string; desc: string }[] = [
-  { id: 'overview',     label: 'Overview',         icon: '▣', desc: 'KPIs & monthly summary'       },
-  { id: 'forecast',     label: 'Forecast',          icon: '◎', desc: '3-month projection'           },
-  { id: 'performance',  label: 'Lead Performance',  icon: '▲', desc: 'Leads & hire rate trends'     },
-  { id: 'hire-rates',   label: 'Hire Rates',        icon: '◉', desc: 'Rate by stream & source'     },
-  { id: 'cost-spend',   label: 'Cost & Spend',      icon: '◆', desc: 'Ad spend & cost per hire'    },
-  { id: 'sources',      label: 'Source Analysis',   icon: '◐', desc: 'Hires & rate by channel'     },
+  { id: 'overview',    label: 'Overview',        icon: '▣', desc: 'KPIs & monthly summary'      },
+  { id: 'forecast',    label: 'Forecast',         icon: '◎', desc: '3-month projection'          },
+  { id: 'performance', label: 'Lead Performance', icon: '▲', desc: 'Leads & hire rate trends'    },
+  { id: 'hire-rates',  label: 'Hire Rates',       icon: '◉', desc: 'Rate by stream & source'    },
+  { id: 'cost-spend',  label: 'Cost & Spend',     icon: '◆', desc: 'Ad spend & cost per hire'   },
+  { id: 'sources',     label: 'Source Analysis',  icon: '◐', desc: 'Hires & rate by channel'    },
+  { id: 'workforce',   label: 'Workforce / HR',   icon: '◈', desc: 'Headcount, movement & tenure'},
 ];
 
 // ── Animated number ───────────────────────────────────────────────────────────
@@ -296,6 +299,41 @@ function SectionContent({ id, data }: { id: SectionId; data: LeadsDataRow[] }) {
           <div style={{ ...CARD, height:400, animation:'fadeSlideIn 0.4s ease 0.1s both' }}><HireRateBySourceChart /></div>
         </div>
       );
+
+    case 'workforce': {
+      // Static workforce data aggregates
+      const WF = [
+        { month:'Jan', onboarded:14, departed:3,  headcount:26 },
+        { month:'Feb', onboarded:13, departed:5,  headcount:33 },
+        { month:'Mar', onboarded:14, departed:10, headcount:32 },
+        { month:'Apr', onboarded:14, departed:7,  headcount:43 },
+        { month:'May', onboarded:15, departed:24, headcount:42 },
+        { month:'Jun', onboarded:13, departed:9,  headcount:45 },
+      ];
+      const currentHeadcount  = WF[WF.length - 1].headcount;
+      const totalOnboarded    = WF.reduce((s, r) => s + r.onboarded, 0);
+      const totalDeparted     = WF.reduce((s, r) => s + r.departed, 0);
+      const netGrowth         = currentHeadcount - WF[0].headcount;
+      const retentionRate     = totalOnboarded > 0 ? ((totalOnboarded - totalDeparted) / totalOnboarded) * 100 : 0;
+      return (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <KPIRow cards={[
+            { label:'Active Headcount', value:currentHeadcount,  sub:'current (Jun 2026)',           gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'🚛' },
+            { label:'Total Onboarded',  value:totalOnboarded,    sub:'Jan – Jun 2026',               gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'✅' },
+            { label:'Total Departed',   value:totalDeparted,     sub:'Jan – Jun 2026',               gradient:'linear-gradient(135deg,#7f1d1d,#dc2626)', icon:'📤' },
+            { label:'Net Growth',       value:netGrowth,         sub:'Jan → Jun headcount change',   gradient:netGrowth >= 0 ? 'linear-gradient(135deg,#065f46,#059669)' : 'linear-gradient(135deg,#7f1d1d,#dc2626)', icon: netGrowth >= 0 ? '📈' : '📉' },
+          ]} />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+            <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease both' }}>
+              <WorkforceMovementChart />
+            </div>
+            <div style={{ ...CARD, height:420, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
+              <TenureDistributionChart />
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 }
 
