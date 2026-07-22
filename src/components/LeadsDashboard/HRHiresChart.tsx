@@ -32,8 +32,40 @@ const HR_COLORS: Record<string, { bar: string; light: string }> = {
 };
 const DEFAULT_COLOR = { bar: '#94a3b8', light: 'rgba(148,163,184,0.12)' };
 
+/** Home company for each HR. Ethan is BP HR who also hired for JM. */
+const HR_COMPANY: Record<string, string> = {
+  Winston: 'JM',
+  Alex:    'JM',
+  Isaac:   'JM',
+  Ethan:   'BP',
+  Alfred:  'JM',
+};
+
 function getColor(hr: string) {
   return HR_COLORS[hr] ?? DEFAULT_COLOR;
+}
+
+function CompanyBadge({ hr }: { hr: string }) {
+  const company = HR_COMPANY[hr] ?? 'JM';
+  const isExternal = company !== 'JM';
+  return (
+    <span
+      title={isExternal ? `${company} HR — also hired for JM` : `${company} HR`}
+      style={{
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        padding: '1px 5px',
+        borderRadius: 4,
+        background: isExternal ? 'rgba(168,85,247,0.12)' : 'rgba(59,130,246,0.1)',
+        color: isExternal ? '#7c3aed' : '#2563eb',
+        border: `1px solid ${isExternal ? 'rgba(168,85,247,0.3)' : 'rgba(59,130,246,0.25)'}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {isExternal ? `${company} → JM` : company}
+    </span>
+  );
 }
 
 export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
@@ -123,7 +155,7 @@ export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
         <div>
           <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Hires by HR Rep — Monthly</div>
           <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>
-            Who hired how many drivers each month · Jan–Jun 2026
+            Who hired how many drivers each month · Jan–Jun 2026 · Ethan is BP HR (also hired for JM)
           </div>
         </div>
         <div style={{
@@ -146,6 +178,7 @@ export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
           }}>
             <div style={{ width:10, height:10, borderRadius:2, background:getColor(hr).bar, flexShrink:0 }} />
             <span style={{ fontSize:11, fontWeight:600, color:'#374151' }}>{hr}</span>
+            <CompanyBadge hr={hr} />
             <span style={{ fontSize:11, color:'#94a3b8' }}>{hrTotals[hr]}</span>
           </div>
         ))}
@@ -160,7 +193,7 @@ export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
       </div>
 
       {/* Chart */}
-      <div style={{ flex:1, minHeight:0 }}>
+      <div style={{ height:260, flexShrink:0 }}>
         <Chart type="bar" data={{ labels, datasets }} options={options} />
       </div>
 
@@ -179,11 +212,132 @@ export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
               {hrTotals[hr]}
             </div>
             <div style={{ fontSize:10, fontWeight:600, color:'#374151', marginTop:2 }}>{hr}</div>
-            <div style={{ fontSize:9, color:'#94a3b8', marginTop:1 }}>
+            <div style={{ marginTop:4, display:'flex', justifyContent:'center' }}>
+              <CompanyBadge hr={hr} />
+            </div>
+            <div style={{ fontSize:9, color:'#94a3b8', marginTop:3 }}>
               {grandTotal > 0 ? ((hrTotals[hr] / grandTotal) * 100).toFixed(0) : 0}% of total
             </div>
           </div>
         ))}
+      </div>
+
+      {/* HR × month table */}
+      <div style={{ overflowX:'auto', border:'1px solid #e2e8f0', borderRadius:10 }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+          <thead>
+            <tr>
+              <th style={{
+                textAlign:'left', padding:'8px 12px', fontSize:11, fontWeight:600,
+                color:'#64748b', background:'#f8fafc', borderBottom:'1px solid #e2e8f0',
+                whiteSpace:'nowrap', position:'sticky', left:0, zIndex:1,
+              }}>
+                HR Rep
+              </th>
+              {data.map(d => (
+                <th key={d.month} style={{
+                  textAlign:'center', padding:'8px 12px', fontSize:11, fontWeight:700,
+                  color:'#0f172a', background:'#f8fafc', borderBottom:'1px solid #e2e8f0',
+                  whiteSpace:'nowrap',
+                }}>
+                  {d.month.replace(' 2026', '')}
+                </th>
+              ))}
+              <th style={{
+                textAlign:'center', padding:'8px 12px', fontSize:11, fontWeight:700,
+                color:'#15803d', background:'#f0fdf4', borderBottom:'1px solid #e2e8f0',
+                whiteSpace:'nowrap',
+              }}>
+                Total
+              </th>
+              <th style={{
+                textAlign:'center', padding:'8px 12px', fontSize:11, fontWeight:600,
+                color:'#64748b', background:'#f8fafc', borderBottom:'1px solid #e2e8f0',
+                whiteSpace:'nowrap',
+              }}>
+                Share
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {hrs.map((hr, i) => (
+              <tr key={hr} style={{ background: i % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                <td style={{
+                  padding:'8px 12px', whiteSpace:'nowrap',
+                  position:'sticky', left:0, zIndex:1,
+                  background: i % 2 === 0 ? '#fff' : '#f8fafc',
+                  borderBottom:'0.5px solid #f1f5f9',
+                }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{
+                      width:8, height:8, borderRadius:2,
+                      background:getColor(hr).bar, flexShrink:0,
+                    }} />
+                    <span style={{ fontWeight:600, color:'#0f172a' }}>{hr}</span>
+                    <CompanyBadge hr={hr} />
+                    <span style={{ fontSize:10, color:'#94a3b8', fontWeight:600 }}>#{i + 1}</span>
+                  </div>
+                </td>
+                {data.map(d => {
+                  const n = d.hires[hr] ?? 0;
+                  return (
+                    <td key={d.month} style={{
+                      padding:'8px 12px', textAlign:'center',
+                      fontWeight: n > 0 ? 700 : 400,
+                      color: n > 0 ? getColor(hr).bar : '#cbd5e1',
+                      borderBottom:'0.5px solid #f1f5f9',
+                    }}>
+                      {n}
+                    </td>
+                  );
+                })}
+                <td style={{
+                  padding:'8px 12px', textAlign:'center', fontWeight:800,
+                  color:getColor(hr).bar, background:'#f0fdf4',
+                  borderBottom:'0.5px solid #f1f5f9',
+                }}>
+                  {hrTotals[hr]}
+                </td>
+                <td style={{
+                  padding:'8px 12px', textAlign:'center', fontWeight:600,
+                  color:'#64748b', borderBottom:'0.5px solid #f1f5f9',
+                }}>
+                  {grandTotal > 0 ? ((hrTotals[hr]! / grandTotal) * 100).toFixed(0) : 0}%
+                </td>
+              </tr>
+            ))}
+            {/* Monthly totals row */}
+            <tr style={{ background:'#f1f5f9' }}>
+              <td style={{
+                padding:'8px 12px', fontWeight:700, color:'#0f172a',
+                position:'sticky', left:0, zIndex:1, background:'#f1f5f9',
+                borderTop:'1px solid #e2e8f0',
+              }}>
+                Monthly Total
+              </td>
+              {data.map(d => (
+                <td key={d.month} style={{
+                  padding:'8px 12px', textAlign:'center', fontWeight:800,
+                  color:'#0f172a', borderTop:'1px solid #e2e8f0',
+                }}>
+                  {d.total}
+                </td>
+              ))}
+              <td style={{
+                padding:'8px 12px', textAlign:'center', fontWeight:800,
+                color:'#15803d', background:'#dcfce7', borderTop:'1px solid #e2e8f0',
+              }}>
+                {grandTotal}
+              </td>
+              <td style={{
+                padding:'8px 12px', textAlign:'center', fontWeight:600,
+                color:'#64748b', borderTop:'1px solid #e2e8f0',
+              }}>
+                100%
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

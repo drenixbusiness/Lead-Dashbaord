@@ -323,7 +323,7 @@ function SectionContent({ id, data, hrData }: { id: SectionId; data: LeadsDataRo
             { label:'Avg Hires / Month', value:avgPerMonth,   decimals:1, sub:'company average',  gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'📅' },
             { label:'HR Reps Active',    value:Object.keys(hrTotals).length, sub:'across all months', gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'👥' },
           ]} />
-          <div style={{ ...CARD, height:480, animation:'fadeSlideIn 0.4s ease both' }}>
+          <div style={{ ...CARD, minHeight:480, height:'auto', animation:'fadeSlideIn 0.4s ease both' }}>
             <HRHiresChart data={hrData} />
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
