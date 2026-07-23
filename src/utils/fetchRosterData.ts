@@ -37,6 +37,20 @@ function parseCSVLine(line: string): string[] {
   return cells;
 }
 
+// Reject junk values that appear in HR column but aren't real HR person names
+function isValidHRName(raw: string): boolean {
+  const v = raw.trim();
+  if (!v || v.length < 2) return false;
+  const low = v.toLowerCase();
+  // Reject if contains month names, keywords, or digits (years like 2025)
+  if (/january|february|march|april|may|june|july|august|september|october|november|december/i.test(v)) return false;
+  if (/leads?|referral|fleet|driver[si]?|new|eski|paid|starpoint|translab|company|comp\b/i.test(low)) return false;
+  if (/\d/.test(v)) return false;
+  // Reject if more than 2 words (HR names are first name, maybe last name)
+  if (v.trim().split(/\s+/).length > 2) return false;
+  return true;
+}
+
 // Normalize a name for fuzzy matching — lowercase, strip punctuation & common suffixes
 function normName(raw: string): string {
   return raw
@@ -70,7 +84,7 @@ async function buildHRMap(): Promise<Map<string, string>> {
           continue;
         }
         const hr = colC.trim();
-        if (!hr || hr.length < 2 || hr.toLowerCase() === 'hr') continue;
+        if (!isValidHRName(hr)) continue;
         const key = normName(colB);
         if (key && !map.has(key)) map.set(key, hr);
       }
@@ -83,8 +97,7 @@ async function buildHRMap(): Promise<Map<string, string>> {
         if (!colB || !colD) continue;
         if (colD.toLowerCase() === 'hr name') continue;
         const hr = colD.trim();
-        // Only use colD if it looks like a person name (not a date, number, or keyword)
-        if (!hr || hr.length < 2 || /^\d|starpoint|translab|paid/i.test(hr)) continue;
+        if (!isValidHRName(hr)) continue;
         const key = normName(colB);
         if (key && !map.has(key)) map.set(key, hr);
       }
