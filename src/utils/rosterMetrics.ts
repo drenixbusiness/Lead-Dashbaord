@@ -29,8 +29,57 @@ function monthKey(d: Date): string {
 }
 
 function monthLabel(key: string): string {
-  const [y, m] = key.split('-').map(Number);
-  return `${MONTH_NAMES[m - 1]} ${y}`;
+  const m = Number(key.split('-')[1]);
+  return MONTH_NAMES[m - 1];
+}
+
+function yearFromKey(key: string): number {
+  return Number(key.split('-')[0]);
+}
+
+/** Inclusive list of YYYY-MM keys from start through end. */
+function monthKeysInRange(startKey: string, endKey: string): string[] {
+  const keys: string[] = [];
+  let [y, m] = startKey.split('-').map(Number);
+  const [ey, em] = endKey.split('-').map(Number);
+  while (y < ey || (y === ey && m <= em)) {
+    keys.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return keys;
+}
+
+/** Tight per-chart Y scale so bars fill the plot (not crushed by company max). */
+export function movementNiceScale(rows: MovementMonth[]): { max: number; step: number } {
+  let dataMax = 0;
+  for (const r of rows) {
+    dataMax = Math.max(dataMax, r.onboarded, r.departed, r.headcount);
+  }
+  // Small headroom only — keep bars visually large (like Chart.js auto-scale)
+  if (dataMax <= 1)  return { max: 2,  step: 1 };
+  if (dataMax <= 2)  return { max: 3,  step: 1 };
+  if (dataMax <= 4)  return { max: 5,  step: 1 };
+  if (dataMax <= 6)  return { max: 8,  step: 1 };
+  if (dataMax <= 8)  return { max: 10, step: 2 };
+  if (dataMax <= 12) return { max: 14, step: 2 };
+  if (dataMax <= 18) return { max: 20, step: 2 };
+  if (dataMax <= 28) return { max: 30, step: 5 };
+  if (dataMax <= 38) return { max: 40, step: 5 };
+  return { max: Math.ceil((dataMax * 1.1) / 5) * 5, step: 5 };
+}
+
+/** @deprecated Prefer movementNiceScale — kept for callers that only need a max. */
+export function movementScaleMax(rows: MovementMonth[]): number {
+  return movementNiceScale(rows).max;
+}
+
+/** Human-readable year note for a set of YYYY-MM keys, e.g. "2026" or "2025–2026". */
+export function movementYearNote(monthKeys: string[]): string {
+  if (monthKeys.length === 0) return '';
+  const years = [...new Set(monthKeys.map(yearFromKey))].sort();
+  if (years.length === 1) return String(years[0]);
+  return `${years[0]}–${years[years.length - 1]}`;
 }
 
 function normalizeHR(raw: string | null): string {
@@ -55,53 +104,80 @@ export function buildHRDataFromRoster(drivers: DriverRecord[]): HRMonthData[] {
 
   return [...byMonth.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, hires]) => ({
-      month: monthLabel(key),
-      hires,
-      total: Object.values(hires).reduce((s, n) => s + n, 0),
-    }));
+    .map(([key, hires]) => {
+      const [y, m] = key.split('-').map(Number);
+      return {
+        month: `${MONTH_NAMES[m - 1]} ${y}`,
+        hires,
+        total: Object.values(hires).reduce((s, n) => s + n, 0),
+      };
+    });
 }
 
 export interface MovementMonth {
+  /** YYYY-MM */
+  monthKey: string;
+  /** Display month only, e.g. "May" */
   month: string;
+  year: number;
   onboarded: number;
   departed: number;
   headcount: number;
 }
 
 /** Monthly onboarding / departures / end-of-month headcount from local roster. */
-export function buildMovementFromRoster(drivers: DriverRecord[]): MovementMonth[] {
-  const keys = new Set<string>();
+export function buildMovementFromRoster(
+  drivers: DriverRecord[],
+  asOf = new Date(),
+  opts?: { alignToMonthKeys?: string[] },
+): MovementMonth[] {
+  const asOfKey = monthKey(asOf);
   const onboarded = new Map<string, number>();
   const departed = new Map<string, number>();
+  const hireKeys: string[] = [];
 
   for (const driver of drivers) {
     const hired = parseISODate(driver.hiredDate);
     if (hired) {
       const k = monthKey(hired);
-      keys.add(k);
-      onboarded.set(k, (onboarded.get(k) ?? 0) + 1);
+      if (k <= asOfKey) {
+        hireKeys.push(k);
+        onboarded.set(k, (onboarded.get(k) ?? 0) + 1);
+      }
     }
     const term = parseISODate(driver.terminationDate);
     if (term) {
       const k = monthKey(term);
-      keys.add(k);
-      departed.set(k, (departed.get(k) ?? 0) + 1);
+      if (k <= asOfKey) {
+        departed.set(k, (departed.get(k) ?? 0) + 1);
+      }
     }
   }
 
-  const sorted = [...keys].sort();
+  let sorted: string[];
+  if (opts?.alignToMonthKeys && opts.alignToMonthKeys.length > 0) {
+    sorted = opts.alignToMonthKeys;
+  } else {
+    if (hireKeys.length === 0 && departed.size === 0) return [];
+    const activityKeys = [...hireKeys, ...departed.keys()].sort();
+    const firstKey = activityKeys[0];
+    const lastKey = activityKeys[activityKeys.length - 1] <= asOfKey
+      ? activityKeys[activityKeys.length - 1]
+      : asOfKey;
+    sorted = monthKeysInRange(firstKey, lastKey);
+  }
+
+  if (sorted.length === 0) return [];
+  const firstKey = sorted[0];
+
   let headcount = 0;
-  // Drivers hired before the first chart month still count toward starting headcount
-  if (sorted.length > 0) {
-    const first = sorted[0];
-    for (const driver of drivers) {
-      const hired = parseISODate(driver.hiredDate);
-      if (!hired) continue;
-      if (monthKey(hired) < first) {
-        const term = parseISODate(driver.terminationDate);
-        if (!term || monthKey(term) >= first) headcount++;
-      }
+  for (const driver of drivers) {
+    const hired = parseISODate(driver.hiredDate);
+    if (!hired) continue;
+    if (monthKey(hired) < firstKey) {
+      const term = parseISODate(driver.terminationDate);
+      const termKey = term ? monthKey(term) : null;
+      if (!termKey || termKey >= firstKey) headcount++;
     }
   }
 
@@ -110,7 +186,9 @@ export function buildMovementFromRoster(drivers: DriverRecord[]): MovementMonth[
     const off = departed.get(key) ?? 0;
     headcount += on - off;
     return {
+      monthKey: key,
       month: monthLabel(key),
+      year: yearFromKey(key),
       onboarded: on,
       departed: off,
       headcount: Math.max(0, headcount),

@@ -17,14 +17,33 @@ import { valueLabelsPlugin } from '../../utils/chartValueLabels';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend);
 
+function ceilToStep(n: number, step = 5): number {
+  if (n <= 0) return step;
+  return Math.ceil(n / step) * step;
+}
+
+/** Shared Y max across HR tenure charts (ticks of 5). */
+export function getSharedTenureScale(driverGroups: DriverRecord[][]): number {
+  let max = 0;
+  for (const group of driverGroups) {
+    for (const b of buildTenureFromRoster(group)) {
+      max = Math.max(max, b.count);
+    }
+  }
+  return ceilToStep(max, 5);
+}
+
 export default function TenureDistributionChart({
   drivers,
   title = 'Tenure Distribution',
   subtitle = 'weeks since first load · active = until today · terminated = until exit',
+  yMax,
 }: {
   drivers: DriverRecord[];
   title?: string;
   subtitle?: string;
+  /** Shared Y max (steps of 5) — used on HR grid like Movement */
+  yMax?: number;
 }) {
   const buckets = buildTenureFromRoster(drivers);
   const total = buckets.reduce((s, b) => s + b.count, 0);
@@ -38,6 +57,8 @@ export default function TenureDistributionChart({
   }
 
   const dominant = buckets.reduce((a, b) => (b.count > a.count ? b : a));
+  const localMax = Math.max(...buckets.map((b) => b.count), 1);
+  const axisMax = yMax ?? ceilToStep(localMax, 5);
 
   const chartData = {
     labels: buckets.map((b) => b.label),
@@ -72,8 +93,14 @@ export default function TenureDistributionChart({
         border: { display: false },
       },
       y: {
+        min: 0,
+        max: axisMax,
         grid: { color: 'rgba(0,0,0,0.04)' },
-        ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 10 },
+        ticks: {
+          color: '#94a3b8',
+          font: { size: 11 },
+          stepSize: 5,
+        },
         border: { display: false },
         beginAtZero: true,
       },

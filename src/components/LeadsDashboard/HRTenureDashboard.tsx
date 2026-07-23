@@ -3,16 +3,14 @@
 import { useMemo, useState } from 'react';
 import type { DriverRecord } from '../../types/roster';
 import { buildTenureFromRoster } from '../../utils/rosterMetrics';
-import TenureDistributionChart from './TenureDistributionChart';
+import TenureDistributionChart, { getSharedTenureScale } from './TenureDistributionChart';
 
 const HR_COLORS: Record<string, string> = {
   Alex:    '#22c55e',
   Winston: '#3b82f6',
   Isaac:   '#f59e0b',
-  Jessica: '#a855f7',
   Alfred:  '#ec4899',
   Ethan:   '#6366f1',
-  Unknown: '#94a3b8',
 };
 
 function normalizeHR(raw: string | null): string {
@@ -25,71 +23,99 @@ function hrColor(hr: string) {
   return HR_COLORS[hr] ?? '#64748b';
 }
 
+function tenureStats(drivers: DriverRecord[]) {
+  const buckets = buildTenureFromRoster(drivers);
+  const tracked = buckets.reduce((s, b) => s + b.count, 0);
+  const active = drivers.filter((d) => !d.terminationDate).length;
+  const left = drivers.filter((d) => d.terminationDate).length;
+  return { tracked, active, left, hired: drivers.length };
+}
+
 const CARD: React.CSSProperties = {
   background: '#fff',
   borderRadius: 12,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-  border: '1px solid rgba(0,0,0,0.05)',
   padding: '16px 18px',
+  border: '1px solid rgba(0,0,0,0.05)',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   display: 'flex',
   flexDirection: 'column',
-  minHeight: 0,
-  overflow: 'hidden',
 };
 
 export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[] }) {
-  const hrList = useMemo(() => {
-    const counts: Record<string, number> = {};
+  const hrNames = useMemo(() => {
+    const totals: Record<string, number> = {};
     for (const d of drivers) {
       const hr = normalizeHR(d.hr);
-      counts[hr] = (counts[hr] ?? 0) + 1;
+      if (hr === 'Unknown') continue;
+      totals[hr] = (totals[hr] ?? 0) + 1;
     }
-    return Object.entries(counts)
+    return Object.entries(totals)
       .sort((a, b) => b[1] - a[1])
-      .map(([hr, count]) => ({ hr, count }));
+      .map(([hr]) => hr);
   }, [drivers]);
 
-  const [selected, setSelected] = useState<string>('ALL');
+  const [selected, setSelected] = useState<string>('all');
+  const activeHR = selected === 'all' || hrNames.includes(selected) ? selected : 'all';
+  const showAll = activeHR === 'all';
 
   const filtered = useMemo(() => {
-    if (selected === 'ALL') return drivers;
-    return drivers.filter((d) => normalizeHR(d.hr) === selected);
-  }, [drivers, selected]);
+    if (showAll) return drivers;
+    return drivers.filter((d) => normalizeHR(d.hr) === activeHR);
+  }, [drivers, activeHR, showAll]);
 
+  // Same Y scale (steps of 5) for every HR chart — matches Movement / BP
+  const sharedYMax = useMemo(() => {
+    const groups = hrNames.map((hr) =>
+      drivers.filter((d) => normalizeHR(d.hr) === hr),
+    );
+    return groups.length ? getSharedTenureScale(groups) : 10;
+  }, [drivers, hrNames]);
+
+  const stats = tenureStats(filtered);
   const buckets = useMemo(() => buildTenureFromRoster(filtered), [filtered]);
-  const tracked = buckets.reduce((s, b) => s + b.count, 0);
   const dominant = buckets.reduce((a, b) => (b.count > a.count ? b : a), buckets[0]);
-  const active = filtered.filter((d) => !d.terminationDate).length;
-  const terminated = filtered.filter((d) => d.terminationDate).length;
-  const scopeLabel = selected === 'ALL' ? 'Company' : selected;
-  const showAllHrs = selected === 'ALL';
+  const accent = showAll ? '#4338ca' : hrColor(activeHR);
+
+  if (drivers.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+        No driver data yet
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Focus filter */}
       <div style={{
-        display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
-        background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px',
+        display: 'flex', gap: 6, flexWrap: 'wrap',
+        background: '#fff', borderRadius: 12, padding: 8,
+        border: '1px solid rgba(0,0,0,0.05)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginRight: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Focus
-        </span>
         <button
           type="button"
-          onClick={() => setSelected('ALL')}
+          onClick={() => setSelected('all')}
           style={{
-            padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-            cursor: 'pointer', border: '1px solid',
-            background: selected === 'ALL' ? '#4338ca' : '#fff',
-            borderColor: selected === 'ALL' ? '#4338ca' : '#e2e8f0',
-            color: selected === 'ALL' ? '#fff' : '#374151',
-            transition: 'all 0.15s',
+            border: showAll ? '1px solid #4338ca' : '1px solid #e2e8f0',
+            background: showAll ? '#eef2ff' : '#f8fafc',
+            color: showAll ? '#4338ca' : '#64748b',
+            borderRadius: 8, padding: '8px 14px', cursor: 'pointer',
+            fontSize: 12, fontWeight: 700,
           }}
         >
-          All HR at once ({drivers.length})
+          All HRs
+          <span style={{
+            marginLeft: 8, fontSize: 11, fontWeight: 700,
+            background: showAll ? '#c7d2fe' : '#e2e8f0',
+            color: showAll ? '#4338ca' : '#64748b',
+            borderRadius: 10, padding: '1px 7px',
+          }}>
+            {drivers.length}
+          </span>
         </button>
-        {hrList.map(({ hr, count }) => {
-          const activePill = selected === hr;
+        {hrNames.map((hr) => {
+          const count = drivers.filter((d) => normalizeHR(d.hr) === hr).length;
+          const on = activeHR === hr;
           const color = hrColor(hr);
           return (
             <button
@@ -97,97 +123,118 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
               type="button"
               onClick={() => setSelected(hr)}
               style={{
-                padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', border: '1px solid',
-                background: activePill ? color : '#fff',
-                borderColor: activePill ? color : `${color}55`,
-                color: activePill ? '#fff' : color,
-                transition: 'all 0.15s',
-                display: 'flex', alignItems: 'center', gap: 6,
+                border: on ? `1px solid ${color}` : '1px solid #e2e8f0',
+                background: on ? `${color}18` : '#f8fafc',
+                color: on ? color : '#64748b',
+                borderRadius: 8, padding: '8px 14px', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: 8,
               }}
             >
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+              {hr}
               <span style={{
-                width: 8, height: 8, borderRadius: 2,
-                background: activePill ? '#fff' : color,
-              }} />
-              {hr} ({count})
+                fontSize: 11, fontWeight: 700,
+                background: on ? `${color}22` : '#e2e8f0',
+                color: on ? color : '#64748b',
+                borderRadius: 10, padding: '1px 7px',
+              }}>
+                {count}
+              </span>
             </button>
           );
         })}
       </div>
 
-      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {[
-          { label: 'Tracked', value: tracked, sub: scopeLabel, color: '#4338ca', bg: '#eef2ff' },
-          { label: 'Still Active', value: active, sub: 'no termination', color: '#15803d', bg: '#f0fdf4' },
-          { label: 'Terminated', value: terminated, sub: 'left company', color: '#dc2626', bg: '#fef2f2' },
-          {
-            label: 'Largest bucket',
-            value: dominant?.count ?? 0,
-            sub: dominant?.label ?? '—',
-            color: '#6366f1',
-            bg: '#eef2ff',
-          },
+          { label: 'Tracked', value: stats.tracked, sub: showAll ? 'all reps' : activeHR, color: accent },
+          { label: 'Still working', value: stats.active, sub: 'not terminated', color: '#15803d' },
+          { label: 'Departed', value: stats.left, sub: 'left company', color: '#dc2626' },
+          { label: 'Largest bucket', value: dominant?.count ?? 0, sub: dominant?.label ?? '—', color: '#6366f1' },
         ].map((k) => (
           <div key={k.label} style={{
-            background: k.bg, border: `1px solid ${k.color}22`,
-            borderRadius: 12, padding: '14px 16px',
+            background: '#fff', borderRadius: 12, padding: '14px 16px',
+            border: '1px solid rgba(0,0,0,0.05)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginTop: 6 }}>{k.label}</div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{k.sub}</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{k.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: k.color, lineHeight: 1.2, marginTop: 4 }}>
+              {k.value}
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{k.sub}</div>
           </div>
         ))}
       </div>
 
-      {showAllHrs ? (
+      {showAll ? (
         <>
-          <div style={{ ...CARD, height: 380 }}>
+          <div style={{ ...CARD, height: 400 }}>
             <TenureDistributionChart
               drivers={drivers}
-              title="Tenure Distribution — Company"
-              subtitle="Weeks since first load · all drivers"
+              title="Tenure Distribution — Company (all HRs)"
+              subtitle="combined · weeks since first load · still working → today · left → leave date"
             />
           </div>
 
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
-              Tenure Distribution — every HR
-            </div>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-              Weeks since first load per rep · all on one page
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
-              gap: 16,
-            }}>
-              {hrList.map(({ hr, count }) => {
-                const hrDrivers = drivers.filter((d) => normalizeHR(d.hr) === hr);
-                const color = hrColor(hr);
-                const hrBuckets = buildTenureFromRoster(hrDrivers);
-                const hrTracked = hrBuckets.reduce((s, b) => s + b.count, 0);
-                if (hrTracked === 0) return null;
-                return (
-                  <div key={hr} style={{ ...CARD, height: 360, borderTop: `3px solid ${color}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+            Tenure by HR — all reps
+            <span style={{ fontWeight: 500, color: '#94a3b8', marginLeft: 8 }}>
+              same Y scale (steps of 5)
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {hrNames.map((hr) => {
+              const subset = drivers.filter((d) => normalizeHR(d.hr) === hr);
+              const s = tenureStats(subset);
+              const color = hrColor(hr);
+              if (s.tracked === 0) return null;
+              return (
+                <div
+                  key={hr}
+                  style={{
+                    ...CARD,
+                    height: 380,
+                    borderTop: `3px solid ${color}`,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setSelected(hr)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelected(hr); }}
+                >
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    marginBottom: 4, gap: 8,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{hr}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                      {s.active} active · {s.hired} hired · {s.left} left
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0 }}>
                     <TenureDistributionChart
-                      drivers={hrDrivers}
-                      title={`${hr} (${count})`}
-                      subtitle="Weeks since first load"
+                      drivers={subset}
+                      title={`Tenure — ${hr}`}
+                      subtitle={`${subset.length} drivers hired by ${hr}`}
+                      yMax={sharedYMax}
                     />
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
         </>
       ) : (
-        <div style={{ ...CARD, height: 420 }}>
+        <div style={{ ...CARD, height: 440 }}>
           <TenureDistributionChart
             drivers={filtered}
-            title={`Tenure Distribution — ${selected}`}
-            subtitle={`Weeks since first load for drivers hired by ${selected}`}
+            title={`Tenure Distribution — ${activeHR}`}
+            subtitle={`drivers hired by ${activeHR} · still working → today · left → leave date`}
+            yMax={sharedYMax}
           />
         </div>
       )}

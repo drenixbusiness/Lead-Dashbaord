@@ -15,7 +15,11 @@ import {
 import type { TooltipItem } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import type { DriverRecord } from '../../types/roster';
-import { buildMovementFromRoster } from '../../utils/rosterMetrics';
+import {
+  buildMovementFromRoster,
+  movementNiceScale,
+  movementYearNote,
+} from '../../utils/rosterMetrics';
 import { valueLabelsPlugin } from '../../utils/chartValueLabels';
 
 ChartJS.register(CategoryScale, LinearScale, BarController, BarElement, LineController, PointElement, LineElement, Tooltip, Legend);
@@ -26,16 +30,30 @@ const LEGEND_ITEMS = [
   { color: '#3b82f6', label: 'Active Headcount', shape: 'line' as const },
 ];
 
+function ceilToStep(n: number, step = 5): number {
+  if (n <= 0) return step;
+  return Math.ceil(n / step) * step;
+}
+
 export default function WorkforceMovementChart({
   drivers,
   title = 'Workforce Movement',
   subtitle = 'onboarding vs departures vs net headcount · from local roster',
+  alignToMonthKeys,
+  yMax,
+  yMin,
 }: {
   drivers: DriverRecord[];
   title?: string;
   subtitle?: string;
+  alignToMonthKeys?: string[];
+  /** Shared Y max (steps of 5) — used on BP-style HR grid */
+  yMax?: number;
+  yMin?: number;
 }) {
-  const data = buildMovementFromRoster(drivers);
+  const data = buildMovementFromRoster(drivers, new Date(), {
+    alignToMonthKeys,
+  });
 
   if (data.length === 0) {
     return (
@@ -45,9 +63,21 @@ export default function WorkforceMovementChart({
     );
   }
 
-  const labels = data.map((d) => d.month.replace(/ \d{4}$/, ''));
-  const netChange = data[data.length - 1].headcount - data[0].headcount;
-  const rangeLabel = `${labels[0]}→${labels[labels.length - 1]}`;
+  const labels = data.map((d) => d.month);
+  const yearNote = movementYearNote(data.map((d) => d.monthKey));
+
+  const local = movementNiceScale(data);
+  const axisMax = yMax ?? ceilToStep(local.max, 5);
+  const axisMin = yMin ?? -ceilToStep(local.max, 5);
+  // When shared scale is passed, lock ticks to 5 like BP
+  const step = yMax != null ? 5 : (local.step >= 5 ? 5 : local.step);
+
+  const totalJoined = data.reduce((s, d) => s + d.onboarded, 0);
+  const totalLeft = data.reduce((s, d) => s + d.departed, 0);
+  const net = totalJoined - totalLeft;
+  const rangeLabel = data.length > 1
+    ? `${labels[0]}→${labels[labels.length - 1]}`
+    : labels[0] ?? '';
 
   const chartData = {
     labels,
@@ -73,7 +103,7 @@ export default function WorkforceMovementChart({
         label: 'Active Headcount',
         data: data.map((d) => d.headcount),
         borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.08)',
+        backgroundColor: 'transparent',
         borderWidth: 2.5,
         pointRadius: 5,
         pointBackgroundColor: '#fff',
@@ -96,6 +126,11 @@ export default function WorkforceMovementChart({
       legend: { display: false },
       tooltip: {
         callbacks: {
+          title: (items: TooltipItem<'bar' | 'line'>[]) => {
+            const idx = items[0]?.dataIndex ?? 0;
+            const row = data[idx];
+            return row ? `${row.month} ${row.year}` : '';
+          },
           label: (ctx: TooltipItem<'bar' | 'line'>) => {
             const v = ctx.parsed.y ?? 0;
             if (ctx.dataset.label === 'Departed') return `Departed: ${Math.abs(v)}`;
@@ -113,34 +148,53 @@ export default function WorkforceMovementChart({
       },
       y: {
         stacked: false,
+        min: axisMin,
+        max: axisMax,
         grid: { color: 'rgba(0,0,0,0.04)' },
+        border: { display: false },
         ticks: {
           color: '#94a3b8',
           font: { size: 11 },
-          callback: (v: string | number) => (typeof v === 'number' && v < 0 ? '' : String(v)),
+          stepSize: step,
+          callback: (v: string | number) => {
+            const n = Number(v);
+            if (!Number.isFinite(n) || n < 0) return '';
+            return String(n);
+          },
         },
-        border: { display: false },
       },
     },
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{title}</div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
             {subtitle}
           </div>
         </div>
-        <div style={{
-          fontSize: 11, fontWeight: 600,
-          background: netChange >= 0 ? '#f0fdf4' : '#fef2f2',
-          color: netChange >= 0 ? '#15803d' : '#dc2626',
-          border: `1px solid ${netChange >= 0 ? '#bbf7d0' : '#fecaca'}`,
-          borderRadius: 20, padding: '3px 10px',
-        }}>
-          {netChange >= 0 ? '▲' : '▼'} Net {Math.abs(netChange)} drivers {rangeLabel}
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {yearNote && (
+            <div style={{
+              fontSize: 11, fontWeight: 700,
+              background: '#eff6ff', color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              borderRadius: 20, padding: '3px 10px',
+            }}>
+              {yearNote}
+            </div>
+          )}
+          <div style={{
+            fontSize: 11, fontWeight: 600,
+            background: net >= 0 ? '#f0fdf4' : '#fef2f2',
+            color: net >= 0 ? '#15803d' : '#dc2626',
+            border: `1px solid ${net >= 0 ? '#bbf7d0' : '#fecaca'}`,
+            borderRadius: 20, padding: '3px 10px',
+          }}>
+            {net >= 0 ? '▲' : '▼'} Net {Math.abs(net)} drivers {rangeLabel}
+          </div>
         </div>
       </div>
 
