@@ -7,12 +7,9 @@ export interface RosterResult {
   error?: string;
 }
 
-// BP sheet with active/terminated roster (start & left dates)
 const BP_ROSTER_ID = '1v3tMPvGFJ4NqIFqCF0INtNuJLYEzZkdQ0ZBqcxDno7M';
-
-// BP HR monthly tabs — driver name + HR name per month
-const BP_HR_ID = '1TpoZFQdXA7wb-Ljuyw53MplTJeKCPRZTxgOyHPH0pZM';
-const BP_HR_GIDS = [1348361704, 1631028660, 1096656459, 693650426, 762556289, 844332491, 1446224036];
+const BP_HR_ID     = '1TpoZFQdXA7wb-Ljuyw53MplTJeKCPRZTxgOyHPH0pZM';
+const BP_HR_GIDS   = [1348361704, 1631028660, 1096656459, 693650426, 762556289, 844332491, 1446224036];
 
 function parseDate(raw: string): string | null {
   if (!raw?.trim()) return null;
@@ -37,21 +34,17 @@ function parseCSVLine(line: string): string[] {
   return cells;
 }
 
-// Reject junk values that appear in HR column but aren't real HR person names
 function isValidHRName(raw: string): boolean {
   const v = raw.trim();
   if (!v || v.length < 2) return false;
   const low = v.toLowerCase();
-  // Reject if contains month names, keywords, or digits (years like 2025)
   if (/january|february|march|april|may|june|july|august|september|october|november|december/i.test(v)) return false;
   if (/leads?|referral|fleet|driver[si]?|new|eski|paid|starpoint|translab|company|comp\b/i.test(low)) return false;
   if (/\d/.test(v)) return false;
-  // Reject if more than 2 words (HR names are first name, maybe last name)
   if (v.trim().split(/\s+/).length > 2) return false;
   return true;
 }
 
-// Normalize a name for fuzzy matching — lowercase, strip punctuation & common suffixes
 function normName(raw: string): string {
   return raw
     .toLowerCase()
@@ -61,7 +54,40 @@ function normName(raw: string): string {
     .trim();
 }
 
-// Build HR lookup map from all monthly tabs: normName -> HR rep name
+// Simple edit distance (Levenshtein) for fuzzy name matching
+function editDist(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 4) return 99;
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+// Look up HR by trying: exact → reversed tokens → fuzzy edit distance
+function lookupHR(name: string, hrMap: Map<string, string>): string | null {
+  const key = normName(name);
+  if (hrMap.has(key)) return hrMap.get(key)!;
+
+  const reversed = key.split(' ').reverse().join(' ');
+  if (hrMap.has(reversed)) return hrMap.get(reversed)!;
+
+  // Fuzzy: find HR map key with lowest edit distance
+  const maxDist = key.length > 14 ? 3 : key.length > 9 ? 2 : key.length > 6 ? 1 : 0;
+  if (maxDist === 0) return null;
+
+  let bestDist = maxDist + 1;
+  let bestHR: string | null = null;
+  for (const [k, v] of hrMap) {
+    const d = Math.min(editDist(key, k), editDist(reversed, k));
+    if (d < bestDist) { bestDist = d; bestHR = v; }
+  }
+  return bestHR;
+}
+
 async function buildHRMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   await Promise.all(BP_HR_GIDS.map(async (gid) => {
@@ -72,34 +98,21 @@ async function buildHRMap(): Promise<Map<string, string>> {
       const lines = (await res.text()).split('\n');
       for (const line of lines) {
         const cells = parseCSVLine(line);
-        // Driver name is col B (index 1), HR name is col C (index 2) for Jan/Feb/Apr/May/Jun/Jul
-        // For Mar there's an extra col, but col C is "New Leads" and col D is HR — find by header scan
-        const colB = cells[1] ?? '';
+        const driverName = cells[1] ?? '';
+        if (!driverName || driverName.length < 2) continue;
+        const dLow = driverName.toLowerCase();
+        if (dLow === 'name' || dLow.includes('mvr') || dLow.includes('process')) continue;
+
+        // HR name is in col C (index 2) for most tabs; col D (index 3) for March-style tabs
         const colC = cells[2] ?? '';
-        if (!colB || !colC) continue;
-        const bLow = colB.toLowerCase();
-        if (bLow === 'name' || bLow === 'hr name' || bLow.includes('mvr') || bLow.includes('type')) continue;
-        if (colC.toLowerCase() === 'hr name' || colC.toLowerCase() === 'new leads') {
-          // March has extra col — skip, will pick up from col D
-          continue;
-        }
-        const hr = colC.trim();
-        if (!isValidHRName(hr)) continue;
-        const key = normName(colB);
-        if (key && !map.has(key)) map.set(key, hr);
-      }
-      // Also handle March-style where HR is col D
-      const lines2 = (await fetch(url, { cache: 'no-store' }).then(r => r.text())).split('\n');
-      for (const line of lines2) {
-        const cells = parseCSVLine(line);
-        const colB = cells[1] ?? '';
         const colD = cells[3] ?? '';
-        if (!colB || !colD) continue;
-        if (colD.toLowerCase() === 'hr name') continue;
-        const hr = colD.trim();
-        if (!isValidHRName(hr)) continue;
-        const key = normName(colB);
+        const hr = isValidHRName(colC) ? colC.trim() : (isValidHRName(colD) ? colD.trim() : null);
+        if (!hr) continue;
+
+        const key = normName(driverName);
+        const rev = key.split(' ').reverse().join(' ');
         if (key && !map.has(key)) map.set(key, hr);
+        if (rev && !map.has(rev)) map.set(rev, hr);
       }
     } catch { /* skip failed tab */ }
   }));
@@ -108,7 +121,6 @@ async function buildHRMap(): Promise<Map<string, string>> {
 
 export async function fetchBPRosterData(): Promise<RosterResult> {
   try {
-    // Fetch both in parallel
     const [rosterRes, hrMap] = await Promise.all([
       fetch(`https://docs.google.com/spreadsheets/d/${BP_ROSTER_ID}/export?format=csv&gid=0`, { cache: 'no-store' }),
       buildHRMap(),
@@ -126,15 +138,12 @@ export async function fetchBPRosterData(): Promise<RosterResult> {
 
       if (!colB || !colC) continue;
       const bLow = colB.toLowerCase();
-      if (bLow.includes('drivers name') || bLow === 'active' || bLow.includes('temporary')) continue;
-      if (bLow.includes('starting date')) continue;
+      if (bLow.includes('drivers name') || bLow === 'active' || bLow.includes('temporary') || bLow.includes('starting date')) continue;
 
       const name = colB.trim();
       if (name.length < 2) continue;
 
-      // Look up HR by normalized name
-      const key = normName(name);
-      const hr = hrMap.get(key) ?? null;
+      const hr = lookupHR(name, hrMap);
 
       drivers.push({
         name,
