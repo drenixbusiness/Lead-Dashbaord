@@ -21,7 +21,9 @@ import ForecastCard from './ForecastCard';
 import WorkforceMovementChart from './WorkforceMovementChart';
 import TenureDistributionChart from './TenureDistributionChart';
 import HRHiresChart from './HRHiresChart';
+import DriverRosterSection from './DriverRosterSection';
 import type { HRMonthData } from '../../types/hr';
+import type { DriverRecord } from '../../types/roster';
 
 // ── Card style ────────────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
@@ -171,7 +173,7 @@ function KPIRow({ cards }: { cards: KPICardProps[] }) {
 }
 
 // ── Section content ───────────────────────────────────────────────────────────
-function SectionContent({ id, data, hrData }: { id: SectionId; data: LeadsDataRow[]; hrData: HRMonthData[] }) {
+function SectionContent({ id, data, hrData, rosterData, showHRTabs }: { id: SectionId; data: LeadsDataRow[]; hrData: HRMonthData[]; rosterData: DriverRecord[]; showHRTabs: boolean }) {
   const grid2: React.CSSProperties = { display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 };
 
   // Shared aggregates used across sections
@@ -323,14 +325,19 @@ function SectionContent({ id, data, hrData }: { id: SectionId; data: LeadsDataRo
             { label:'Avg Hires / Month', value:avgPerMonth,   decimals:1, sub:'company average',  gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'📅' },
             { label:'HR Reps Active',    value:Object.keys(hrTotals).length, sub:'across all months', gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'👥' },
           ]} />
-          <div style={{ ...CARD, minHeight:480, height:'auto', animation:'fadeSlideIn 0.4s ease both' }}>
+          <div style={{ ...CARD, animation:'fadeSlideIn 0.4s ease both' }}>
             <HRHiresChart data={hrData} />
           </div>
+          {rosterData.length > 0 && (
+            <div style={{ animation:'fadeSlideIn 0.4s ease 0.15s both' }}>
+              <DriverRosterSection drivers={rosterData} showHRTabs={showHRTabs} />
+            </div>
+          )}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-            <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.1s both' }}>
+            <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
               <WorkforceMovementChart />
             </div>
-            <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
+            <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.3s both' }}>
               <TenureDistributionChart />
             </div>
           </div>
@@ -341,9 +348,9 @@ function SectionContent({ id, data, hrData }: { id: SectionId; data: LeadsDataRo
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-interface Props { data: LeadsDataRow[]; error?: string; company?: string; hrData?: HRMonthData[]; }
+interface Props { data: LeadsDataRow[]; error?: string; company?: string; hrData?: HRMonthData[]; rosterData?: DriverRecord[]; }
 
-export default function DashboardContent({ data, error, company = 'JM', hrData = [] }: Props) {
+export default function DashboardContent({ data, error, company = 'JM', hrData = [], rosterData = [] }: Props) {
   const [mounted, setMounted]        = useState(false);
   const [active, setActive]          = useState<SectionId>('overview');
   const [sidebarOpen, setSidebar]    = useState(true);
@@ -694,7 +701,7 @@ export default function DashboardContent({ data, error, company = 'JM', hrData =
                     <p>{activeSection.desc}{range ? ` · ${range}` : ''}</p>
                   </div>
                 </div>
-                <SectionContent id={active} data={data} hrData={hrData} />
+                <SectionContent id={active} data={data} hrData={hrData} rosterData={rosterData} showHRTabs={company === 'JM'} />
               </>
             )}
           </main>

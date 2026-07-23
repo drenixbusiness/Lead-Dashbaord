@@ -1,5 +1,6 @@
 import { fetchLeadsData } from '../utils/fetchLeadsData';
 import { fetchHRData } from '../utils/fetchHRData';
+import { JM_DRIVERS } from '../data/jmDrivers';
 import DashboardContent from '../components/LeadsDashboard/DashboardContent';
 
 export const metadata = {
@@ -11,5 +12,5 @@ export default async function Home() {
     fetchLeadsData(),
     fetchHRData(),
   ]);
-  return <DashboardContent data={data} error={error} company="JM" hrData={hrData} />;
+  return <DashboardContent data={data} error={error} company="JM" hrData={hrData} rosterData={JM_DRIVERS} />;
 }

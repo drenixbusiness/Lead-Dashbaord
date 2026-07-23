@@ -149,7 +149,7 @@ export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', gap:12 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <div>
