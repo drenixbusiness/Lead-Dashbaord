@@ -16,7 +16,15 @@ import { buildTenureFromRoster } from '../../utils/rosterMetrics';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend);
 
-export default function TenureDistributionChart({ drivers }: { drivers: DriverRecord[] }) {
+export default function TenureDistributionChart({
+  drivers,
+  title = 'Tenure Distribution',
+  subtitle = 'weeks since first load · active = until today · terminated = until exit',
+}: {
+  drivers: DriverRecord[];
+  title?: string;
+  subtitle?: string;
+}) {
   const buckets = buildTenureFromRoster(drivers);
   const total = buckets.reduce((s, b) => s + b.count, 0);
 
@@ -74,9 +82,9 @@ export default function TenureDistributionChart({ drivers }: { drivers: DriverRe
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Tenure Distribution</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{title}</div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-            weeks since first load · active = until today · terminated = until exit
+            {subtitle}
           </div>
         </div>
         <div style={{
