@@ -22,6 +22,7 @@ import WorkforceMovementChart from './WorkforceMovementChart';
 import TenureDistributionChart from './TenureDistributionChart';
 import HRHiresChart from './HRHiresChart';
 import HRMovementDashboard from './HRMovementDashboard';
+import HRTenureDashboard from './HRTenureDashboard';
 import DriverRosterSection from './DriverRosterSection';
 import type { HRMonthData } from '../../types/hr';
 import type { DriverRecord } from '../../types/roster';
@@ -40,7 +41,7 @@ const CARD: React.CSSProperties = {
 };
 
 // ── Sidebar sections ──────────────────────────────────────────────────────────
-type SectionId = 'overview' | 'forecast' | 'performance' | 'hire-rates' | 'cost-spend' | 'sources' | 'workforce' | 'hr-movement';
+type SectionId = 'overview' | 'forecast' | 'performance' | 'hire-rates' | 'cost-spend' | 'sources' | 'workforce' | 'hr-movement' | 'hr-tenure';
 
 const SECTIONS: { id: SectionId; label: string; icon: string; desc: string }[] = [
   { id: 'overview',     label: 'Overview',         icon: '▣', desc: 'KPIs & monthly summary'       },
@@ -50,7 +51,8 @@ const SECTIONS: { id: SectionId; label: string; icon: string; desc: string }[] =
   { id: 'cost-spend',   label: 'Cost & Spend',      icon: '◆', desc: 'Ad spend & cost per hire'    },
   { id: 'sources',      label: 'Source Analysis',   icon: '◐', desc: 'Hires & rate by channel'     },
   { id: 'workforce',    label: 'Workforce / HR',    icon: '◈', desc: 'Headcount, movement & tenure'},
-  { id: 'hr-movement',  label: 'HR by Rep',         icon: '▦', desc: 'Movement & tenure per HR'    },
+  { id: 'hr-movement',  label: 'HR Movement',       icon: '▦', desc: 'Movement chart per HR rep'   },
+  { id: 'hr-tenure',    label: 'HR Tenure',         icon: '▥', desc: 'Tenure chart per HR rep'     },
 ];
 
 // ── Animated number ───────────────────────────────────────────────────────────
@@ -354,6 +356,13 @@ function SectionContent({ id, data, hrData, rosterData, showHRTabs }: { id: Sect
       return (
         <div style={{ animation: 'fadeSlideIn 0.4s ease both' }}>
           <HRMovementDashboard drivers={rosterData} />
+        </div>
+      );
+
+    case 'hr-tenure':
+      return (
+        <div style={{ animation: 'fadeSlideIn 0.4s ease both' }}>
+          <HRTenureDashboard drivers={rosterData} />
         </div>
       );
   }

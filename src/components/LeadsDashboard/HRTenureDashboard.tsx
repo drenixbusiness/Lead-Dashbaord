@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import type { DriverRecord } from '../../types/roster';
-import { buildMovementFromRoster } from '../../utils/rosterMetrics';
-import WorkforceMovementChart from './WorkforceMovementChart';
+import { buildTenureFromRoster } from '../../utils/rosterMetrics';
+import TenureDistributionChart from './TenureDistributionChart';
 
 const HR_COLORS: Record<string, string> = {
   Alex:    '#22c55e',
@@ -37,7 +37,7 @@ const CARD: React.CSSProperties = {
   overflow: 'hidden',
 };
 
-export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord[] }) {
+export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[] }) {
   const hrList = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const d of drivers) {
@@ -56,20 +56,17 @@ export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord
     return drivers.filter((d) => normalizeHR(d.hr) === selected);
   }, [drivers, selected]);
 
-  const movement = useMemo(() => buildMovementFromRoster(filtered), [filtered]);
+  const buckets = useMemo(() => buildTenureFromRoster(filtered), [filtered]);
+  const tracked = buckets.reduce((s, b) => s + b.count, 0);
+  const dominant = buckets.reduce((a, b) => (b.count > a.count ? b : a), buckets[0]);
   const active = filtered.filter((d) => !d.terminationDate).length;
   const terminated = filtered.filter((d) => d.terminationDate).length;
-  const net = movement.length > 0
-    ? movement[movement.length - 1].headcount - movement[0].headcount
-    : 0;
-  const totalOnboarded = movement.reduce((s, m) => s + m.onboarded, 0);
-  const totalDeparted = movement.reduce((s, m) => s + m.departed, 0);
-
   const scopeLabel = selected === 'ALL' ? 'Company' : selected;
   const showAllHrs = selected === 'ALL';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Focus filter */}
       <div style={{
         display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px',
@@ -83,8 +80,8 @@ export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord
           style={{
             padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700,
             cursor: 'pointer', border: '1px solid',
-            background: selected === 'ALL' ? '#0f172a' : '#fff',
-            borderColor: selected === 'ALL' ? '#0f172a' : '#e2e8f0',
+            background: selected === 'ALL' ? '#4338ca' : '#fff',
+            borderColor: selected === 'ALL' ? '#4338ca' : '#e2e8f0',
             color: selected === 'ALL' ? '#fff' : '#374151',
             transition: 'all 0.15s',
           }}
@@ -119,12 +116,19 @@ export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord
         })}
       </div>
 
+      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {[
-          { label: 'Drivers (scope)', value: filtered.length, sub: scopeLabel, color: '#1e40af', bg: '#eff6ff' },
-          { label: 'Still Active', value: active, sub: `${terminated} terminated`, color: '#15803d', bg: '#f0fdf4' },
-          { label: 'Onboarded', value: totalOnboarded, sub: 'in period', color: '#22c55e', bg: '#f0fdf4' },
-          { label: 'Departed', value: totalDeparted, sub: net >= 0 ? `net +${net}` : `net ${net}`, color: '#dc2626', bg: '#fef2f2' },
+          { label: 'Tracked', value: tracked, sub: scopeLabel, color: '#4338ca', bg: '#eef2ff' },
+          { label: 'Still Active', value: active, sub: 'no termination', color: '#15803d', bg: '#f0fdf4' },
+          { label: 'Terminated', value: terminated, sub: 'left company', color: '#dc2626', bg: '#fef2f2' },
+          {
+            label: 'Largest bucket',
+            value: dominant?.count ?? 0,
+            sub: dominant?.label ?? '—',
+            color: '#6366f1',
+            bg: '#eef2ff',
+          },
         ].map((k) => (
           <div key={k.label} style={{
             background: k.bg, border: `1px solid ${k.color}22`,
@@ -140,19 +144,19 @@ export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord
       {showAllHrs ? (
         <>
           <div style={{ ...CARD, height: 380 }}>
-            <WorkforceMovementChart
+            <TenureDistributionChart
               drivers={drivers}
-              title="Workforce Movement — Company"
-              subtitle="All HR reps combined · onboarding vs departures vs headcount"
+              title="Tenure Distribution — Company"
+              subtitle="Weeks since first load · all drivers"
             />
           </div>
 
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
-              Workforce Movement — every HR
+              Tenure Distribution — every HR
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
-              All reps on one page · no need to switch tabs
+              Weeks since first load per rep · all on one page
             </div>
             <div style={{
               display: 'grid',
@@ -162,12 +166,15 @@ export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord
               {hrList.map(({ hr, count }) => {
                 const hrDrivers = drivers.filter((d) => normalizeHR(d.hr) === hr);
                 const color = hrColor(hr);
+                const hrBuckets = buildTenureFromRoster(hrDrivers);
+                const hrTracked = hrBuckets.reduce((s, b) => s + b.count, 0);
+                if (hrTracked === 0) return null;
                 return (
                   <div key={hr} style={{ ...CARD, height: 360, borderTop: `3px solid ${color}` }}>
-                    <WorkforceMovementChart
+                    <TenureDistributionChart
                       drivers={hrDrivers}
                       title={`${hr} (${count})`}
-                      subtitle="Onboarded / departed / active headcount"
+                      subtitle="Weeks since first load"
                     />
                   </div>
                 );
@@ -177,10 +184,10 @@ export default function HRMovementDashboard({ drivers }: { drivers: DriverRecord
         </>
       ) : (
         <div style={{ ...CARD, height: 420 }}>
-          <WorkforceMovementChart
+          <TenureDistributionChart
             drivers={filtered}
-            title={`Workforce Movement — ${selected}`}
-            subtitle={`Drivers hired by ${selected} · onboarded / departed / active headcount`}
+            title={`Tenure Distribution — ${selected}`}
+            subtitle={`Weeks since first load for drivers hired by ${selected}`}
           />
         </div>
       )}

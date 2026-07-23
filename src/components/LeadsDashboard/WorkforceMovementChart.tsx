@@ -16,6 +16,7 @@ import type { TooltipItem } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import type { DriverRecord } from '../../types/roster';
 import { buildMovementFromRoster } from '../../utils/rosterMetrics';
+import { valueLabelsPlugin } from '../../utils/chartValueLabels';
 
 ChartJS.register(CategoryScale, LinearScale, BarController, BarElement, LineController, PointElement, LineElement, Tooltip, Legend);
 
@@ -89,6 +90,7 @@ export default function WorkforceMovementChart({
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: { padding: { top: 18, bottom: 8 } },
     interaction: { mode: 'index' as const, intersect: false },
     plugins: {
       legend: { display: false },
@@ -156,7 +158,7 @@ export default function WorkforceMovementChart({
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <Chart type="bar" data={chartData} options={options} />
+        <Chart type="bar" data={chartData} options={options} plugins={[valueLabelsPlugin as never]} />
       </div>
     </div>
   );

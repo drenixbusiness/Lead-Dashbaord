@@ -13,6 +13,7 @@ import type { TooltipItem } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import type { DriverRecord } from '../../types/roster';
 import { buildTenureFromRoster } from '../../utils/rosterMetrics';
+import { valueLabelsPlugin } from '../../utils/chartValueLabels';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, BarController, Tooltip, Legend);
 
@@ -54,6 +55,7 @@ export default function TenureDistributionChart({
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: { padding: { top: 18 } },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -116,7 +118,7 @@ export default function TenureDistributionChart({
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <Bar data={chartData} options={options} />
+        <Bar data={chartData} options={options} plugins={[valueLabelsPlugin as never]} />
       </div>
 
       <div style={{
