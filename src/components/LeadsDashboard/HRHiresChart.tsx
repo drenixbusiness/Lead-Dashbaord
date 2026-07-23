@@ -155,7 +155,7 @@ export default function HRHiresChart({ data }: { data: HRMonthData[] }) {
         <div>
           <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>Hires by HR Rep — Monthly</div>
           <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>
-            Who hired how many drivers each month · Jan–Jun 2026 · Ethan is BP HR (also hired for JM)
+            Who hired how many drivers each month · from local roster
           </div>
         </div>
         <div style={{

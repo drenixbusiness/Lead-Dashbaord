@@ -14,18 +14,10 @@ import {
 } from 'chart.js';
 import type { TooltipItem } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
+import type { DriverRecord } from '../../types/roster';
+import { buildMovementFromRoster } from '../../utils/rosterMetrics';
 
 ChartJS.register(CategoryScale, LinearScale, BarController, BarElement, LineController, PointElement, LineElement, Tooltip, Legend);
-
-// Static data from HR sheet — update when new months are available
-const DATA = [
-  { month: 'Jan 2026', onboarded: 14, departed: 3,  headcount: 26 },
-  { month: 'Feb 2026', onboarded: 13, departed: 5,  headcount: 33 },
-  { month: 'Mar 2026', onboarded: 14, departed: 10, headcount: 32 },
-  { month: 'Apr 2026', onboarded: 14, departed: 7,  headcount: 43 },
-  { month: 'May 2026', onboarded: 15, departed: 24, headcount: 42 },
-  { month: 'Jun 2026', onboarded: 13, departed: 9,  headcount: 45 },
-];
 
 const LEGEND_ITEMS = [
   { color: '#22c55e', label: 'New Drivers', shape: 'bar' as const },
@@ -33,9 +25,20 @@ const LEGEND_ITEMS = [
   { color: '#3b82f6', label: 'Active Headcount', shape: 'line' as const },
 ];
 
-export default function WorkforceMovementChart() {
-  const labels    = DATA.map(d => d.month.replace(' 2026', ''));
-  const netChange = DATA[DATA.length - 1].headcount - DATA[0].headcount;
+export default function WorkforceMovementChart({ drivers }: { drivers: DriverRecord[] }) {
+  const data = buildMovementFromRoster(drivers);
+
+  if (data.length === 0) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: 13 }}>
+        No roster data available
+      </div>
+    );
+  }
+
+  const labels = data.map((d) => d.month.replace(/ \d{4}$/, ''));
+  const netChange = data[data.length - 1].headcount - data[0].headcount;
+  const rangeLabel = `${labels[0]}→${labels[labels.length - 1]}`;
 
   const chartData = {
     labels,
@@ -43,7 +46,7 @@ export default function WorkforceMovementChart() {
       {
         type: 'bar' as const,
         label: 'New Drivers',
-        data: DATA.map(d => d.onboarded),
+        data: data.map((d) => d.onboarded),
         backgroundColor: 'rgba(34,197,94,0.85)',
         borderRadius: 4,
         order: 2,
@@ -51,7 +54,7 @@ export default function WorkforceMovementChart() {
       {
         type: 'bar' as const,
         label: 'Departed',
-        data: DATA.map(d => -d.departed),
+        data: data.map((d) => -d.departed),
         backgroundColor: 'rgba(239,68,68,0.8)',
         borderRadius: 4,
         order: 2,
@@ -59,7 +62,7 @@ export default function WorkforceMovementChart() {
       {
         type: 'line' as const,
         label: 'Active Headcount',
-        data: DATA.map(d => d.headcount),
+        data: data.map((d) => d.headcount),
         borderColor: '#3b82f6',
         backgroundColor: 'rgba(59,130,246,0.08)',
         borderWidth: 2.5,
@@ -71,7 +74,6 @@ export default function WorkforceMovementChart() {
         fill: false,
         yAxisID: 'y',
         order: 1,
-        datalabels: { display: false },
       },
     ],
   };
@@ -114,12 +116,11 @@ export default function WorkforceMovementChart() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 12 }}>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Workforce Movement</div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-            onboarding vs departures vs net headcount · Static data
+            onboarding vs departures vs net headcount · from local roster
           </div>
         </div>
         <div style={{
@@ -129,13 +130,12 @@ export default function WorkforceMovementChart() {
           border: `1px solid ${netChange >= 0 ? '#bbf7d0' : '#fecaca'}`,
           borderRadius: 20, padding: '3px 10px',
         }}>
-          {netChange >= 0 ? '▲' : '▼'} Net {Math.abs(netChange)} drivers Jan→Jun
+          {netChange >= 0 ? '▲' : '▼'} Net {Math.abs(netChange)} drivers {rangeLabel}
         </div>
       </div>
 
-      {/* Custom legend */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        {LEGEND_ITEMS.map(item => (
+        {LEGEND_ITEMS.map((item) => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {item.shape === 'bar' ? (
               <div style={{ width: 12, height: 12, borderRadius: 2, background: item.color }} />
@@ -147,7 +147,6 @@ export default function WorkforceMovementChart() {
         ))}
       </div>
 
-      {/* Chart */}
       <div style={{ flex: 1, minHeight: 0 }}>
         <Chart type="bar" data={chartData} options={options} />
       </div>

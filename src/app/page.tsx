@@ -1,6 +1,6 @@
 import { fetchLeadsData } from '../utils/fetchLeadsData';
-import { fetchHRData } from '../utils/fetchHRData';
 import { JM_DRIVERS } from '../data/jmDrivers';
+import { buildHRDataFromRoster } from '../utils/rosterMetrics';
 import DashboardContent from '../components/LeadsDashboard/DashboardContent';
 
 export const metadata = {
@@ -8,9 +8,16 @@ export const metadata = {
 };
 
 export default async function Home() {
-  const [{ data, error }, { data: hrData }] = await Promise.all([
-    fetchLeadsData(),
-    fetchHRData(),
-  ]);
-  return <DashboardContent data={data} error={error} company="JM" hrData={hrData} rosterData={JM_DRIVERS} />;
+  const { data, error } = await fetchLeadsData();
+  // HR hires come only from local JM roster — Google Hire List sheet is disconnected
+  const hrData = buildHRDataFromRoster(JM_DRIVERS);
+  return (
+    <DashboardContent
+      data={data}
+      error={error}
+      company="JM"
+      hrData={hrData}
+      rosterData={JM_DRIVERS}
+    />
+  );
 }

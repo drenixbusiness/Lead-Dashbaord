@@ -106,7 +106,7 @@ function DriverTable({ rows, type }: { rows: DriverRecord[]; type: 'hired' | 'te
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            const weeks = calcWeeks(r.hiredDate, isTerminated ? r.terminationDate : null);
+            const weeks = calcWeeks(r.firstLoad ?? r.hiredDate, isTerminated ? r.terminationDate : null);
             return (
               <tr key={i} style={{ borderBottom: '1px solid #f8fafc', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                 <td style={{ padding: '8px 12px', color: '#cbd5e1', fontSize: 11 }}>{i + 1}</td>

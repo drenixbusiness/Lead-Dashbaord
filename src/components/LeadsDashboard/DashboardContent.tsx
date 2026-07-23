@@ -305,7 +305,7 @@ function SectionContent({ id, data, hrData, rosterData, showHRTabs }: { id: Sect
       );
 
     case 'workforce': {
-      // Live HR data aggregates
+      // Local roster HR aggregates (not Google Hire List sheet)
       const totalHiredHR  = hrData.reduce((s, m) => s + m.total, 0);
       const hrTotals: Record<string, number> = {};
       for (const m of hrData) {
@@ -316,11 +316,14 @@ function SectionContent({ id, data, hrData, rosterData, showHRTabs }: { id: Sect
       const topHR     = Object.entries(hrTotals).sort((a, b) => b[1] - a[1])[0];
       const numMonths = hrData.length;
       const avgPerMonth = numMonths > 0 ? totalHiredHR / numMonths : 0;
+      const monthRange = hrData.length > 0
+        ? `${hrData[0].month} – ${hrData[hrData.length - 1].month}`
+        : '—';
 
       return (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <KPIRow cards={[
-            { label:'Total Hires (HR)',  value:totalHiredHR,  sub:'Jan – Jun 2026 · all reps',    gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'✅' },
+            { label:'Total Hires (HR)',  value:totalHiredHR,  sub:`${monthRange} · local roster`, gradient:'linear-gradient(135deg,#1e40af,#3b82f6)', icon:'✅' },
             { label:'Top HR Rep',        value:topHR?.[1] ?? 0, sub:topHR?.[0] ?? '—',            gradient:'linear-gradient(135deg,#065f46,#059669)', icon:'🏆' },
             { label:'Avg Hires / Month', value:avgPerMonth,   decimals:1, sub:'company average',  gradient:'linear-gradient(135deg,#5b21b6,#7c3aed)', icon:'📅' },
             { label:'HR Reps Active',    value:Object.keys(hrTotals).length, sub:'across all months', gradient:'linear-gradient(135deg,#92400e,#f59e0b)', icon:'👥' },
@@ -335,10 +338,10 @@ function SectionContent({ id, data, hrData, rosterData, showHRTabs }: { id: Sect
           )}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
             <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.2s both' }}>
-              <WorkforceMovementChart />
+              <WorkforceMovementChart drivers={rosterData} />
             </div>
             <div style={{ ...CARD, height:380, animation:'fadeSlideIn 0.4s ease 0.3s both' }}>
-              <TenureDistributionChart />
+              <TenureDistributionChart drivers={rosterData} />
             </div>
           </div>
         </div>

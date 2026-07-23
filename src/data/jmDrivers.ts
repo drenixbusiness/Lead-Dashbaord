@@ -136,7 +136,7 @@ export const JM_DRIVERS: DriverRecord[] = [
   },
   {
     "name": "CRIS PAZ",
-    "hiredDate": "2026-12-26",
+    "hiredDate": "2026-02-26",
     "terminationDate": "2026-03-13",
     "hr": "WINSTON",
     "firstLoad": "2026-02-16"
@@ -297,7 +297,7 @@ export const JM_DRIVERS: DriverRecord[] = [
   },
   {
     "name": "JEAN SENAT",
-    "hiredDate": "4/6/0206",
+    "hiredDate": "2026-04-06",
     "terminationDate": null,
     "hr": "WINSTON",
     "firstLoad": "2026-04-07"
