@@ -25,6 +25,36 @@ function fmt(d: string | null) {
   } catch { return d; }
 }
 
+function calcWeeks(start: string | null, end: string | null): number | null {
+  if (!start) return null;
+  try {
+    const s = new Date(start + 'T00:00:00').getTime();
+    const e = end ? new Date(end + 'T00:00:00').getTime() : Date.now();
+    return Math.floor((e - s) / (7 * 24 * 60 * 60 * 1000));
+  } catch { return null; }
+}
+
+function WeeksBadge({ weeks, active }: { weeks: number | null; active: boolean }) {
+  if (weeks === null) return <span style={{ color: '#cbd5e1' }}>—</span>;
+  const color = active
+    ? weeks >= 12 ? '#15803d' : weeks >= 6 ? '#0369a1' : '#7c3aed'
+    : '#6b7280';
+  const bg = active
+    ? weeks >= 12 ? '#dcfce7' : weeks >= 6 ? '#e0f2fe' : '#ede9fe'
+    : '#f3f4f6';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      background: bg, color, border: `1px solid ${color}30`,
+      borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700,
+      whiteSpace: 'nowrap',
+    }}>
+      {active && <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block', animation: 'pulse 2s infinite' }} />}
+      {weeks}w{active ? ' ↑' : ''}
+    </span>
+  );
+}
+
 function Badge({ color, label }: { color: string; label: string }) {
   return (
     <span style={{
@@ -49,6 +79,8 @@ function DriverTable({ rows, type }: { rows: DriverRecord[]; type: 'hired' | 'te
   }
 
   const isTerminated = type === 'terminated';
+  const hasHR        = rows.some(r => r.hr);
+  const hasFirstLoad = rows.some(r => r.firstLoad);
 
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -61,37 +93,44 @@ function DriverTable({ rows, type }: { rows: DriverRecord[]; type: 'hired' | 'te
             {isTerminated && (
               <th style={{ padding: '8px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>Terminated</th>
             )}
-            {rows.some(r => r.hr) && (
+            {hasHR && (
               <th style={{ padding: '8px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>HR Rep</th>
             )}
-            {rows.some(r => r.firstLoad) && (
+            {hasFirstLoad && (
               <th style={{ padding: '8px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>First Load</th>
             )}
+            <th style={{ padding: '8px 12px', textAlign: 'left', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              Weeks {!isTerminated && <span style={{ fontSize: 9, color: '#22c55e' }}>● LIVE</span>}
+            </th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f8fafc', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-              <td style={{ padding: '8px 12px', color: '#cbd5e1', fontSize: 11 }}>{i + 1}</td>
-              <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1e293b' }}>
-                {r.name}
-              </td>
-              <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{fmt(r.hiredDate)}</td>
-              {isTerminated && (
-                <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
-                  <span style={{ color: '#dc2626', fontWeight: 600 }}>{fmt(r.terminationDate)}</span>
-                </td>
-              )}
-              {rows.some(d => d.hr) && (
+          {rows.map((r, i) => {
+            const weeks = calcWeeks(r.hiredDate, isTerminated ? r.terminationDate : null);
+            return (
+              <tr key={i} style={{ borderBottom: '1px solid #f8fafc', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                <td style={{ padding: '8px 12px', color: '#cbd5e1', fontSize: 11 }}>{i + 1}</td>
+                <td style={{ padding: '8px 12px', fontWeight: 600, color: '#1e293b' }}>{r.name}</td>
+                <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{fmt(r.hiredDate)}</td>
+                {isTerminated && (
+                  <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#dc2626', fontWeight: 600 }}>{fmt(r.terminationDate)}</span>
+                  </td>
+                )}
+                {hasHR && (
+                  <td style={{ padding: '8px 12px' }}>
+                    {r.hr ? <Badge color={hrColor(r.hr)} label={r.hr} /> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                  </td>
+                )}
+                {hasFirstLoad && (
+                  <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{fmt(r.firstLoad)}</td>
+                )}
                 <td style={{ padding: '8px 12px' }}>
-                  {r.hr ? <Badge color={hrColor(r.hr)} label={r.hr} /> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                  <WeeksBadge weeks={weeks} active={!isTerminated} />
                 </td>
-              )}
-              {rows.some(d => d.firstLoad) && (
-                <td style={{ padding: '8px 12px', color: '#475569', whiteSpace: 'nowrap' }}>{fmt(r.firstLoad)}</td>
-              )}
-            </tr>
-          ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -106,8 +145,9 @@ interface Props {
 export default function DriverRosterSection({ drivers, showHRTabs = true }: Props) {
   const [activeTab, setActiveTab] = useState<string>('company');
 
-  // Build tab list
-  const hrReps = showHRTabs
+  // Build tab list — auto-enable HR tabs if any driver has an HR assigned
+  const hasAnyHR = drivers.some(d => d.hr);
+  const hrReps = (showHRTabs || hasAnyHR)
     ? [...new Set(drivers.map(d => d.hr).filter(Boolean) as string[])].sort()
     : [];
 
