@@ -17,6 +17,7 @@ import { Chart } from 'react-chartjs-2';
 import type { DriverRecord } from '../../types/roster';
 import {
   buildMovementFromRoster,
+  MOVEMENT_YEAR_KEYS,
   movementNiceScale,
   movementYearNote,
 } from '../../utils/rosterMetrics';
@@ -39,7 +40,7 @@ export default function WorkforceMovementChart({
   drivers,
   title = 'Workforce Movement',
   subtitle = 'onboarding vs departures vs net headcount · from local roster',
-  alignToMonthKeys,
+  alignToMonthKeys = MOVEMENT_YEAR_KEYS,
   yMax,
   yMin,
 }: {
@@ -55,7 +56,8 @@ export default function WorkforceMovementChart({
     alignToMonthKeys,
   });
 
-  if (data.length === 0) {
+  const hasAny = data.some((d) => d.onboarded != null || d.departed != null || d.headcount != null);
+  if (!hasAny) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: 13 }}>
         No roster data available
@@ -69,15 +71,16 @@ export default function WorkforceMovementChart({
   const local = movementNiceScale(data);
   const axisMax = yMax ?? ceilToStep(local.max, 5);
   const axisMin = yMin ?? -ceilToStep(local.max, 5);
-  // When shared scale is passed, lock ticks to 5 like BP
   const step = yMax != null ? 5 : (local.step >= 5 ? 5 : local.step);
 
-  const totalJoined = data.reduce((s, d) => s + d.onboarded, 0);
-  const totalLeft = data.reduce((s, d) => s + d.departed, 0);
+  const totalJoined = data.reduce((s, d) => s + (d.onboarded ?? 0), 0);
+  const totalLeft = data.reduce((s, d) => s + (d.departed ?? 0), 0);
   const net = totalJoined - totalLeft;
-  const rangeLabel = data.length > 1
-    ? `${labels[0]}→${labels[labels.length - 1]}`
-    : labels[0] ?? '';
+
+  const withData = data.filter((d) => d.headcount != null || d.onboarded != null);
+  const rangeLabel = withData.length > 1
+    ? `${withData[0].month}→${withData[withData.length - 1].month}`
+    : withData[0]?.month ?? '';
 
   const chartData = {
     labels,
@@ -93,7 +96,7 @@ export default function WorkforceMovementChart({
       {
         type: 'bar' as const,
         label: 'Departed',
-        data: data.map((d) => -d.departed),
+        data: data.map((d) => (d.departed == null ? null : -d.departed)),
         backgroundColor: 'rgba(239,68,68,0.8)',
         borderRadius: 4,
         order: 2,
@@ -105,12 +108,14 @@ export default function WorkforceMovementChart({
         borderColor: '#3b82f6',
         backgroundColor: 'transparent',
         borderWidth: 2.5,
-        pointRadius: 5,
+        pointRadius: data.map((d) => (d.headcount == null ? 0 : 5)),
+        pointHoverRadius: data.map((d) => (d.headcount == null ? 0 : 6)),
         pointBackgroundColor: '#fff',
         pointBorderColor: '#3b82f6',
         pointBorderWidth: 2,
         tension: 0.3,
         fill: false,
+        spanGaps: false,
         yAxisID: 'y',
         order: 1,
       },
@@ -125,6 +130,7 @@ export default function WorkforceMovementChart({
     plugins: {
       legend: { display: false },
       tooltip: {
+        filter: (item: TooltipItem<'bar' | 'line'>) => item.parsed.y != null,
         callbacks: {
           title: (items: TooltipItem<'bar' | 'line'>[]) => {
             const idx = items[0]?.dataIndex ?? 0;
@@ -132,7 +138,8 @@ export default function WorkforceMovementChart({
             return row ? `${row.month} ${row.year}` : '';
           },
           label: (ctx: TooltipItem<'bar' | 'line'>) => {
-            const v = ctx.parsed.y ?? 0;
+            const v = ctx.parsed.y;
+            if (v == null) return '';
             if (ctx.dataset.label === 'Departed') return `Departed: ${Math.abs(v)}`;
             return `${ctx.dataset.label}: ${v}`;
           },

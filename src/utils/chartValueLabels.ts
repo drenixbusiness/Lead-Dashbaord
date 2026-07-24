@@ -15,6 +15,7 @@ export const valueLabelsPlugin: Plugin<ChartType> = {
 
       meta.data.forEach((element, index) => {
         const raw = dataset.data[index];
+        if (raw == null) return;
         const value = typeof raw === 'number' ? raw : Number(raw);
         if (!Number.isFinite(value) || value === 0) return;
 
@@ -27,14 +28,12 @@ export const valueLabelsPlugin: Plugin<ChartType> = {
 
         const isBar = meta.type === 'bar';
         if (isBar) {
-          // Place label near the tip of the bar (above positive, below negative)
           const above = value >= 0;
           ctx.textBaseline = above ? 'bottom' : 'top';
           ctx.fillStyle = '#374151';
           const tipY = above ? Math.min(y, base ?? y) : Math.max(y, base ?? y);
           ctx.fillText(label, x, tipY + (above ? -4 : 4));
         } else {
-          // Line points: label above the point
           ctx.textBaseline = 'bottom';
           ctx.fillStyle = '#1e40af';
           ctx.fillText(label, x, y - 8);

@@ -86,6 +86,25 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <style>{`
+        .hrt-kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .hrt-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .hrt-card-company { height: 400px; }
+        .hrt-card-hr { height: 380px; }
+        .hrt-card-focus { height: 440px; }
+        .hrt-hr-meta { font-size: 11px; color: #64748b; font-weight: 600; white-space: nowrap; }
+        @media (max-width: 900px) {
+          .hrt-kpi { grid-template-columns: repeat(2, 1fr); }
+          .hrt-charts { grid-template-columns: 1fr; }
+          .hrt-card-company, .hrt-card-hr, .hrt-card-focus { height: 340px; }
+        }
+        @media (max-width: 520px) {
+          .hrt-kpi { grid-template-columns: 1fr; }
+          .hrt-hr-head { flex-direction: column; align-items: flex-start !important; }
+          .hrt-hr-meta { white-space: normal; }
+        }
+      `}</style>
+
       <div style={{
         display: 'flex', gap: 6, flexWrap: 'wrap',
         background: '#fff', borderRadius: 12, padding: 8,
@@ -146,7 +165,7 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="hrt-kpi">
         {[
           { label: 'Tracked', value: stats.tracked, sub: showAll ? 'all reps' : activeHR, color: accent },
           { label: 'Still working', value: stats.active, sub: 'not terminated', color: '#15803d' },
@@ -157,6 +176,7 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
             background: '#fff', borderRadius: 12, padding: '14px 16px',
             border: '1px solid rgba(0,0,0,0.05)',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            minWidth: 0,
           }}>
             <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{k.label}</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: k.color, lineHeight: 1.2, marginTop: 4 }}>
@@ -169,7 +189,7 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
 
       {showAll ? (
         <>
-          <div style={{ ...CARD, height: 400 }}>
+          <div className="hrt-card-company" style={{ ...CARD, minWidth: 0 }}>
             <TenureDistributionChart
               drivers={drivers}
               title="Tenure Distribution — Company (all HRs)"
@@ -183,7 +203,7 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
               same Y scale (steps of 5)
             </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className="hrt-charts">
             {hrNames.map((hr) => {
               const subset = drivers.filter((d) => normalizeHR(d.hr) === hr);
               const s = tenureStats(subset);
@@ -192,9 +212,10 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
               return (
                 <div
                   key={hr}
+                  className="hrt-card-hr"
                   style={{
                     ...CARD,
-                    height: 380,
+                    minWidth: 0,
                     borderTop: `3px solid ${color}`,
                     cursor: 'pointer',
                   }}
@@ -203,15 +224,15 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelected(hr); }}
                 >
-                  <div style={{
+                  <div className="hrt-hr-head" style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     marginBottom: 4, gap: 8,
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
                       <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{hr}</span>
                     </div>
-                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                    <div className="hrt-hr-meta">
                       {s.active} active · {s.hired} hired · {s.left} left
                     </div>
                   </div>
@@ -229,7 +250,7 @@ export default function HRTenureDashboard({ drivers }: { drivers: DriverRecord[]
           </div>
         </>
       ) : (
-        <div style={{ ...CARD, height: 440 }}>
+        <div className="hrt-card-focus" style={{ ...CARD, minWidth: 0 }}>
           <TenureDistributionChart
             drivers={filtered}
             title={`Tenure Distribution — ${activeHR}`}

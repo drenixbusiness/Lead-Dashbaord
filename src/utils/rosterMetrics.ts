@@ -54,7 +54,12 @@ function monthKeysInRange(startKey: string, endKey: string): string[] {
 export function movementNiceScale(rows: MovementMonth[]): { max: number; step: number } {
   let dataMax = 0;
   for (const r of rows) {
-    dataMax = Math.max(dataMax, r.onboarded, r.departed, r.headcount);
+    dataMax = Math.max(
+      dataMax,
+      r.onboarded ?? 0,
+      r.departed ?? 0,
+      r.headcount ?? 0,
+    );
   }
   // Small headroom only — keep bars visually large (like Chart.js auto-scale)
   if (dataMax <= 1)  return { max: 2,  step: 1 };
@@ -120,9 +125,25 @@ export interface MovementMonth {
   /** Display month only, e.g. "May" */
   month: string;
   year: number;
-  onboarded: number;
-  departed: number;
-  headcount: number;
+  /** null = no data for this month (future / before first activity) */
+  onboarded: number | null;
+  departed: number | null;
+  headcount: number | null;
+}
+
+/** Movement charts only count drivers hired from Jan 2026 onward. */
+export const MOVEMENT_HIRE_CUTOFF = '2026-01';
+
+/** Full calendar year axis for movement charts. */
+export const MOVEMENT_YEAR_KEYS = monthKeysInRange('2026-01', '2026-12');
+
+/** Keep drivers hired on/after Jan 2026 (drop earlier hires). */
+export function filterDriversHiredFrom2026(drivers: DriverRecord[]): DriverRecord[] {
+  return drivers.filter((d) => {
+    const hired = parseISODate(d.hiredDate);
+    if (!hired) return false;
+    return monthKey(hired) >= MOVEMENT_HIRE_CUTOFF;
+  });
 }
 
 /** Monthly onboarding / departures / end-of-month headcount from local roster. */
@@ -132,16 +153,17 @@ export function buildMovementFromRoster(
   opts?: { alignToMonthKeys?: string[] },
 ): MovementMonth[] {
   const asOfKey = monthKey(asOf);
+  // Ignore anyone hired before Jan 2026
+  const cohort = filterDriversHiredFrom2026(drivers);
+
   const onboarded = new Map<string, number>();
   const departed = new Map<string, number>();
-  const hireKeys: string[] = [];
 
-  for (const driver of drivers) {
+  for (const driver of cohort) {
     const hired = parseISODate(driver.hiredDate);
     if (hired) {
       const k = monthKey(hired);
       if (k <= asOfKey) {
-        hireKeys.push(k);
         onboarded.set(k, (onboarded.get(k) ?? 0) + 1);
       }
     }
@@ -154,44 +176,47 @@ export function buildMovementFromRoster(
     }
   }
 
-  let sorted: string[];
-  if (opts?.alignToMonthKeys && opts.alignToMonthKeys.length > 0) {
-    sorted = opts.alignToMonthKeys;
-  } else {
-    if (hireKeys.length === 0 && departed.size === 0) return [];
-    const activityKeys = [...hireKeys, ...departed.keys()].sort();
-    const firstKey = activityKeys[0];
-    const lastKey = activityKeys[activityKeys.length - 1] <= asOfKey
-      ? activityKeys[activityKeys.length - 1]
-      : asOfKey;
-    sorted = monthKeysInRange(firstKey, lastKey);
-  }
+  // Always show full Jan–Dec 2026 unless a caller overrides
+  const sorted =
+    opts?.alignToMonthKeys && opts.alignToMonthKeys.length > 0
+      ? opts.alignToMonthKeys
+      : MOVEMENT_YEAR_KEYS;
 
   if (sorted.length === 0) return [];
-  const firstKey = sorted[0];
+
+  const activityKeys = [...onboarded.keys(), ...departed.keys()].sort();
+  const firstActivity = activityKeys[0] ?? null;
 
   let headcount = 0;
-  for (const driver of drivers) {
-    const hired = parseISODate(driver.hiredDate);
-    if (!hired) continue;
-    if (monthKey(hired) < firstKey) {
-      const term = parseISODate(driver.terminationDate);
-      const termKey = term ? monthKey(term) : null;
-      if (!termKey || termKey >= firstKey) headcount++;
-    }
-  }
+  let started = false;
 
   return sorted.map((key) => {
+    const future = key > asOfKey;
+    const beforeStart = firstActivity != null && key < firstActivity;
     const on = onboarded.get(key) ?? 0;
     const off = departed.get(key) ?? 0;
-    headcount += on - off;
+
+    if (future || !firstActivity || beforeStart) {
+      return {
+        monthKey: key,
+        month: monthLabel(key),
+        year: yearFromKey(key),
+        onboarded: null,
+        departed: null,
+        headcount: null,
+      };
+    }
+
+    headcount = Math.max(0, headcount + on - off);
+    started = true;
     return {
       monthKey: key,
       month: monthLabel(key),
       year: yearFromKey(key),
       onboarded: on,
       departed: off,
-      headcount: Math.max(0, headcount),
+      // Keep 0 headcount after start if everyone left — that's real data
+      headcount: started ? headcount : null,
     };
   });
 }
